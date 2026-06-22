@@ -1,5 +1,3 @@
-from typing import Optional
-
 from fastapi import FastAPI
 
 from app.core.config import get_settings

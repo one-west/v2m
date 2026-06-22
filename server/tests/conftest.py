@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.config import get_settings
 from app.main import create_app
 from app.store import db
 from app.transcribe.fake import FakeTranscriber
@@ -22,5 +23,6 @@ def transcriber():
 def client(engine, transcriber, tmp_path, monkeypatch):
     monkeypatch.setenv("V2M_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.delenv("V2M_HF_TOKEN", raising=False)
+    get_settings.cache_clear()
     app = create_app(engine=engine, transcriber=transcriber)
     return TestClient(app)
