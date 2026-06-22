@@ -35,7 +35,7 @@ def test_too_long_flag():
     assert build_prompt(big).too_long is True
 
 
-def test_prompt_endpoint_409_before_ready(client, monkeypatch):
+def test_prompt_endpoint_200_when_ready(client):
     # upload but force status away from done by deleting transcript
     files = {"file": ("m.webm", io.BytesIO(b"a"), "audio/webm")}
     rec_id = client.post("/api/recordings", files=files).json()["id"]
@@ -43,3 +43,13 @@ def test_prompt_endpoint_409_before_ready(client, monkeypatch):
     resp = client.get(f"/api/recordings/{rec_id}/prompt")
     assert resp.status_code == 200
     assert "transcript_text" in resp.json()
+
+
+def test_prompt_endpoint_409_when_not_ready(client, engine):
+    from sqlmodel import Session
+    from app.store import repo
+    with Session(engine) as s:
+        rec = repo.create_recording(s, title="X", audio_path="/x.webm")
+        rec_id = rec.id
+    resp = client.get(f"/api/recordings/{rec_id}/prompt")
+    assert resp.status_code == 409
