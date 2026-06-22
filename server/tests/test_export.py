@@ -34,3 +34,15 @@ def test_export_bad_format(client):
     files = {"file": ("m.webm", io.BytesIO(b"a"), "audio/webm")}
     rec_id = client.post("/api/recordings", files=files).json()["id"]
     assert client.get(f"/api/recordings/{rec_id}/export?format=pdf").status_code == 400
+
+
+def test_export_409_when_not_ready(client, engine):
+    from sqlmodel import Session
+    from app.store import repo
+    with Session(engine) as s:
+        rec_id = repo.create_recording(s, title="X", audio_path="/x.webm").id
+    assert client.get(f"/api/recordings/{rec_id}/export?format=md").status_code == 409
+
+
+def test_export_404_missing(client):
+    assert client.get("/api/recordings/nope/export?format=md").status_code == 404
