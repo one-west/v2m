@@ -19,12 +19,19 @@
 | 결과물 관리 | **전사본만 관리** | 정형화된 회의록은 claude.ai 측에 남김 |
 | 대상 기기 | AMD Ryzen AI 7 445 / 32GB RAM / GPU 가속 약함(CPU 기반) | 모델 크기를 CPU 친화적으로 선택 |
 
+### 데스크탑 앱 확장 (계획됨, 구현은 Phase 2)
+비개발자가 "서버 켜고 브라우저 열기" 없이 더블클릭으로 쓰도록 데스크탑 앱으로 래핑할 계획.
+**전략: 웹앱 먼저 → 데스크탑 래핑.** MVP는 로컬 웹앱으로 빠르게 만들되, 처음부터
+"데스크탑 준비된" 구조(§5.5 가드레일)로 설계해 나중에 동일 백엔드를 거의 무수정으로 래핑.
+패키징 방식은 §13 참고 (현 권장: pywebview + PyInstaller).
+
 ### 명시적 비목표 (YAGNI)
 - 앱 내 LLM 호출 (Claude API / Ollama) — 미포함 (향후 확장 여지만 남김)
 - 정형화된 회의록의 앱 내 저장·PDF/Word 내보내기
 - 다중 기기/외부 접속, 멀티 유저, 인증
 - 오프라인 업로드 동기화 큐(tus·Background Sync) — localhost라 불필요
 - PWA 오프라인 셸 — localhost 전용이라 불필요
+- 데스크탑 패키징·코드서명·자동업데이트 — Phase 2 (단, 가드레일은 지금 반영)
 
 ## 3. 아키텍처 개요
 
@@ -76,11 +83,35 @@ v2m/
       store/db.py         # 세션·초기화
       prompt/builder.py   # 회의록 프롬프트 + 전사본 직렬화
       export/markdown.py  # 전사본 MD/TXT 내보내기
-    data/                 # SQLite + 오디오 (gitignore)
+      core/paths.py       # 앱 데이터 디렉터리 해석 (%LOCALAPPDATA%/v2m)
+      core/config.py      # config.json 로드/저장 (모델 크기·언어·토큰·포트)
+      setup/firstrun.py   # 첫 실행 모델/ffmpeg 다운로드 + 진행률
 ```
 
 > 프론트(TS)·백엔드(Python)가 다른 언어라 pnpm 워크스페이스 없이 두 폴더로 단순 분리.
 > 운영 시 FastAPI가 `web/dist` 정적 파일을 서빙해 단일 프로세스로 실행.
+
+**데이터 위치 (데스크탑 대비)**: SQLite·오디오·모델·로그·config는 설치 폴더가 아닌
+**`%LOCALAPPDATA%\v2m\`** 아래(`db/`, `audio/`, `models/`, `logs/`, `config.json`)에 저장.
+HF 캐시(`HF_HOME`)도 이 경로로 지정. (설치 폴더는 읽기전용일 수 있어 절대 쓰지 않음)
+
+## 5.5 데스크탑 준비 가드레일 (MVP에 지금 반영)
+
+나중에 pywebview/Electron 등으로 래핑할 때 백엔드 무수정 재사용을 위해 처음부터 반영:
+
+1. **포트 설정 가능** — `HOST`/`PORT`를 env/config에서 읽고, 점유 시 OS 할당(포트 0) 후
+   선택 포트를 `%LOCALAPPDATA%\v2m\runtime.json`에 기록. `8000` 하드코딩 금지.
+2. **프론트는 상대경로 `/api`** 호출 (절대 `http://localhost:8000` 금지) — 개발은 Vite 프록시,
+   운영은 동일 출처. 동적 포트가 UI에 투명.
+3. **헬스 체크** `GET /health` → `{status, version, models_ready}` (셸이 폴링 후 창 표시).
+4. **앱 데이터 디렉터리 추상화** — 시작 시 1회 해석(§5 경로). 쓰기 가능한 건 전부 여기로.
+5. **`config.json`** — 모델 크기·언어·HF 토큰·CPU/GPU·포트. 백엔드 부팅 시 로드, UI 설정 화면에서 저장.
+6. **첫 실행 셋업 플로우** — `GET /setup/status` / `POST /setup/download` / 진행률(SSE 또는 폴링)로
+   Whisper·pyannote·ffmpeg를 앱 데이터로 다운로드 + 체크섬 검증. 이후 `local_files_only=True`로 오프라인 고정.
+7. **ffmpeg 경로 설정** — `FFMPEG_PATH` 설정값(기본: 앱 데이터, 폴백: 동봉). PATH 가정 금지.
+8. **우아한 종료** — `POST /shutdown` 또는 SIGTERM 처리로 창 닫힐 때 uvicorn 정리(고아 프로세스 방지).
+9. **단일 버전 소스** — `/health`+config로 자동업데이트/체인지로그 로직을 나중에 단순화.
+10. **CPU 전용 torch** — 기본 빌드는 CPU 전용(용량 급감). GPU는 향후 별도 옵션 다운로드.
 
 ## 6. 데이터 모델
 
@@ -162,13 +193,36 @@ recorded → transcribing → done
 
 ## 12. 실행 방식
 
-- 백엔드: Python 3.11+, `uvicorn app.main:app`. ffmpeg PATH 필요. `.env`에 HF 토큰.
+- 백엔드: Python 3.11+, `uvicorn app.main:app`. ffmpeg 동봉/경로 설정. HF 토큰은 `%LOCALAPPDATA%\v2m\config.json`(또는 개발 시 `.env`).
 - 프론트: 개발 시 Vite dev 서버가 `/api`를 FastAPI로 프록시. 운영 시 `web/dist` 빌드 후 FastAPI가 서빙.
 - 단일 명령 실행 스크립트로 서버 기동 → 브라우저에서 `http://localhost:<port>` 접속.
 
-## 13. 향후 확장 여지 (지금은 미구현)
+## 13. 데스크탑 앱 패키징 (Phase 2)
+
+### 권장: pywebview + PyInstaller
+백엔드가 이미 Python이고 UI가 로컬 웹앱이므로, **OS 내장 WebView2**(Win10/11 기본 탑재)에
+띄우는 pywebview가 동일 ML 용량 대비 **설치파일 최소·단일 언어·CI 최단순**.
+인스톨러는 Inno Setup, 자동업데이트는 별도 구성(또는 전체 재설치).
+
+| 방식 | 셸 오버헤드 | 자동업데이트 | 언어 수 | 평가 |
+|---|---|---|---|---|
+| **pywebview + PyInstaller** | ~1–5MB (WebView2 재사용) | 직접 구성 | 1 (Python) | **1순위** — 최소·최단순 |
+| Electron + Python 자식프로세스 | ~85–150MB (Chromium 동봉) | 성숙(electron-updater) | 2 (JS+Py) | 2순위 — 자동업데이트 중요시 |
+| Tauri + Python 사이드카 | ~3–10MB (Rust 셸) | 내장 서명 업데이터 | 3 (Rust+JS+Py) | 3순위 — Rust 부담, 핵심난관 미해결 |
+
+> 모든 방식이 결국 PyInstaller로 같은 Python 백엔드를 동결 → **PyTorch 번들링 난관은 공통**이라
+> 셸 선택의 차별점이 아님. (필요 시 PyInstaller 대신 **Nuitka** — ML 플러그인으로 torch 번들이 더 깔끔, 단 빌드 느림)
+
+### Phase 2 핵심 작업
+- **CPU 전용 torch** 빌드 (용량 2.5GB+ → ~200MB)
+- **모델 첫 실행 다운로드**(§5.5-6) — 설치파일에 미동봉
+- **pyannote 가중치 재호스팅**(MIT 라이선스) → 비개발자용 HF 토큰 벽 제거
+- **ffmpeg 정적 바이너리 동봉**
+- **코드서명** — 오픈소스면 SignPath Foundation 무료 OV (미서명 시 SmartScreen 경고)
+- Inno Setup 인스톨러, GitHub Actions로 .exe 빌드
+
+## 14. 기타 향후 확장 여지 (미구현)
 
 - `MinutesGenerator` 인터페이스 추가로 앱 내 자동 정형화(Claude API / 로컬 Ollama) 옵션
 - 정형화 회의록 앱 내 저장·검색
-- Tauri 래핑으로 원클릭 데스크톱 실행
 - 외부 접속(터널) 또는 무료 클라우드 호스팅
