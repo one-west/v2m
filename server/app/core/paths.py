@@ -33,5 +33,5 @@ def get_logs_dir() -> Path:
 
 
 def get_db_path() -> Path:
-    _ensure("db")
-    return get_data_dir() / "db" / "v2m.db"
+    db_dir = _ensure("db")
+    return db_dir / "v2m.db"

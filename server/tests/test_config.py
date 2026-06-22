@@ -16,3 +16,8 @@ def test_env_override(monkeypatch):
     s = Settings(_env_file=None)
     assert s.whisper_model == "small"
     assert s.port == 9001
+
+
+def test_get_settings_is_cached():
+    from app.core.config import get_settings
+    assert get_settings() is get_settings()
