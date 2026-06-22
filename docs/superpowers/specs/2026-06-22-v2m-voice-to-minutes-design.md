@@ -105,7 +105,8 @@ HF 캐시(`HF_HOME`)도 이 경로로 지정. (설치 폴더는 읽기전용일 
    운영은 동일 출처. 동적 포트가 UI에 투명.
 3. **헬스 체크** `GET /health` → `{status, version, models_ready}` (셸이 폴링 후 창 표시).
 4. **앱 데이터 디렉터리 추상화** — 시작 시 1회 해석(§5 경로). 쓰기 가능한 건 전부 여기로.
-5. **`config.json`** — 모델 크기·언어·HF 토큰·CPU/GPU·포트. 백엔드 부팅 시 로드, UI 설정 화면에서 저장.
+5. **설정 소스** — MVP는 `.env`(HF 토큰·모델 크기=`medium`·포트). 데스크탑 단계에서
+   `config.json`(앱 데이터) + UI 설정 화면으로 이전. 둘 다 동일 설정 키를 읽도록 로더 추상화.
 6. **첫 실행 셋업 플로우** — `GET /setup/status` / `POST /setup/download` / 진행률(SSE 또는 폴링)로
    Whisper·pyannote·ffmpeg를 앱 데이터로 다운로드 + 체크섬 검증. 이후 `local_files_only=True`로 오프라인 고정.
 7. **ffmpeg 경로 설정** — `FFMPEG_PATH` 설정값(기본: 앱 데이터, 폴백: 동봉). PATH 가정 금지.
@@ -193,7 +194,9 @@ recorded → transcribing → done
 
 ## 12. 실행 방식
 
-- 백엔드: Python 3.11+, `uvicorn app.main:app`. ffmpeg 동봉/경로 설정. HF 토큰은 `%LOCALAPPDATA%\v2m\config.json`(또는 개발 시 `.env`).
+- 백엔드: Python 3.11+, `uvicorn app.main:app`. ffmpeg 동봉/경로 설정.
+- **MVP 설정은 `.env`** (HF 토큰, STT 모델=기본 `medium`, 포트 등). 데스크탑 단계(Phase 2)에서
+  `%LOCALAPPDATA%\v2m\config.json` + UI 설정 화면으로 이전(§5.5-5).
 - 프론트: 개발 시 Vite dev 서버가 `/api`를 FastAPI로 프록시. 운영 시 `web/dist` 빌드 후 FastAPI가 서빙.
 - 단일 명령 실행 스크립트로 서버 기동 → 브라우저에서 `http://localhost:<port>` 접속.
 
