@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api.recordings import router as recordings_router
 from app.core.config import get_settings
 from app.core.health import check_models_ready
 from app.store import db as db_module
@@ -17,6 +18,8 @@ def create_app(*, engine=None, transcriber=None) -> FastAPI:
     app.state.engine = engine
     app.state.transcriber = transcriber
     app.state.settings = settings
+
+    app.include_router(recordings_router)
 
     @app.get("/health")
     def health() -> dict:
