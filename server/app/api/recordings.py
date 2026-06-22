@@ -6,6 +6,7 @@ from sqlmodel import Session
 
 from app.jobs.queue import run_transcription
 from app.core.paths import get_audio_dir
+from app.prompt.builder import build_prompt
 from app.store import repo
 from app.store.models import RecordingStatus
 
@@ -89,6 +90,15 @@ def get_status(request: Request, rec_id: str):
     with Session(request.app.state.engine) as session:
         rec = _get_or_404(session, rec_id)
         return {"id": rec.id, "status": rec.status, "error": rec.error}
+
+
+@router.get("/recordings/{rec_id}/prompt")
+def get_prompt(request: Request, rec_id: str):
+    with Session(request.app.state.engine) as session:
+        rec = _get_or_404(session, rec_id)
+        if not rec.transcript:
+            raise HTTPException(status_code=409, detail="transcript not ready")
+        return build_prompt(rec.transcript).model_dump()
 
 
 @router.post("/recordings/{rec_id}/retry")
