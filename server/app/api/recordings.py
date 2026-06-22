@@ -38,7 +38,12 @@ async def create_recording(
         rec_id = rec.id
 
     dest = get_audio_dir() / f"{rec_id}.webm"
-    dest.write_bytes(await file.read())
+    try:
+        dest.write_bytes(await file.read())
+    except Exception:
+        with Session(engine) as session:
+            repo.delete_recording(session, rec_id)
+        raise HTTPException(status_code=500, detail="failed to save audio")
 
     with Session(engine) as session:
         rec = repo.get_recording(session, rec_id)

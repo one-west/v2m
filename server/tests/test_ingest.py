@@ -22,3 +22,13 @@ def test_upload_defaults_title_when_missing(client):
     resp = client.post("/api/recordings", files=files)
     assert resp.status_code == 201
     assert resp.json()["title"]
+
+
+def test_upload_write_failure_leaves_no_orphan_row(client, monkeypatch, tmp_path):
+    import app.api.recordings as rec_mod
+    # Point audio dir at a path whose parent does not exist so write_bytes fails
+    monkeypatch.setattr(rec_mod, "get_audio_dir", lambda: tmp_path / "missing_parent" / "sub")
+    files = {"file": ("m.webm", io.BytesIO(b"a"), "audio/webm")}
+    resp = client.post("/api/recordings", files=files)
+    assert resp.status_code == 500
+    assert client.get("/api/recordings").json() == []
