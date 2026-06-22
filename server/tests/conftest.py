@@ -24,5 +24,5 @@ def client(engine, transcriber, tmp_path, monkeypatch):
     monkeypatch.setenv("V2M_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.delenv("V2M_HF_TOKEN", raising=False)
     get_settings.cache_clear()
-    app = create_app(engine=engine, transcriber=transcriber)
+    app = create_app(engine=engine, transcriber=transcriber, shutdown_hook=lambda: None)
     return TestClient(app)

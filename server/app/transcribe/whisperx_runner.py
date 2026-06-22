@@ -37,6 +37,8 @@ class WhisperXTranscriber:
         texts: list[str] = []
         for seg in final.get("segments", []):
             text = seg.get("text", "").strip()
+            if not text:
+                continue
             segments.append(TranscriptSegment(
                 speaker=seg.get("speaker", "SPEAKER_00"),
                 start_ms=int(seg.get("start", 0) * 1000),

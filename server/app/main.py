@@ -3,7 +3,7 @@ import signal
 import threading
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
 from app.api.recordings import router as recordings_router
@@ -19,7 +19,16 @@ def _default_transcriber(settings):
     return WhisperXTranscriber(model_size=settings.whisper_model, hf_token=settings.hf_token)
 
 
-def create_app(*, engine=None, transcriber=None) -> FastAPI:
+def _default_shutdown() -> None:
+    def _send_sigterm():
+        import time
+        time.sleep(1)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    threading.Thread(target=_send_sigterm, daemon=True).start()
+
+
+def create_app(*, engine=None, transcriber=None, shutdown_hook=None) -> FastAPI:
     settings = get_settings()
     if engine is None:
         engine = db_module.get_engine()
@@ -31,19 +40,15 @@ def create_app(*, engine=None, transcriber=None) -> FastAPI:
     app.state.engine = engine
     app.state.transcriber = transcriber
     app.state.settings = settings
+    app.state.shutdown_hook = shutdown_hook or _default_shutdown
 
     @app.get("/health")
     def health() -> dict:
         return {"status": "ok", "version": VERSION, "models_ready": check_models_ready(settings)}
 
     @app.post("/shutdown")
-    def shutdown() -> dict:
-        def _send_sigterm():
-            import time
-            time.sleep(1)
-            os.kill(os.getpid(), signal.SIGTERM)
-
-        threading.Thread(target=_send_sigterm, daemon=True).start()
+    def shutdown(request: Request) -> dict:
+        request.app.state.shutdown_hook()
         return {"status": "shutting_down"}
 
     app.include_router(recordings_router)
