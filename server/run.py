@@ -3,8 +3,12 @@ import uvicorn
 from app.core.config import get_settings
 from app.main import create_app
 
-app = create_app()
+
+def main() -> None:
+    settings = get_settings()
+    app = create_app()
+    uvicorn.run(app, host=settings.host, port=settings.port)
+
 
 if __name__ == "__main__":
-    s = get_settings()
-    uvicorn.run(app, host=s.host, port=s.port)
+    main()
