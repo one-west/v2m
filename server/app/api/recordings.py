@@ -6,6 +6,7 @@ from sqlmodel import Session
 
 from app.jobs.queue import run_transcription
 from app.core.paths import get_audio_dir
+from app.export.markdown import to_markdown, to_txt
 from app.prompt.builder import build_prompt
 from app.store import repo
 from app.store.models import RecordingStatus
@@ -99,6 +100,22 @@ def get_prompt(request: Request, rec_id: str):
         if not rec.transcript:
             raise HTTPException(status_code=409, detail="transcript not ready")
         return build_prompt(rec.transcript).model_dump()
+
+
+@router.get("/recordings/{rec_id}/export")
+def export(request: Request, rec_id: str, format: str = "md"):
+    if format not in ("md", "txt"):
+        raise HTTPException(status_code=400, detail="format must be md or txt")
+    with Session(request.app.state.engine) as session:
+        rec = _get_or_404(session, rec_id)
+        if not rec.transcript:
+            raise HTTPException(status_code=409, detail="transcript not ready")
+        if format == "md":
+            content, media, ext = to_markdown(rec.title, rec.transcript), "text/markdown", "md"
+        else:
+            content, media, ext = to_txt(rec.title, rec.transcript), "text/plain", "txt"
+    headers = {"Content-Disposition": f'attachment; filename="{rec_id}.{ext}"'}
+    return Response(content=content, media_type=media, headers=headers)
 
 
 @router.post("/recordings/{rec_id}/retry")
