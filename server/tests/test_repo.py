@@ -52,3 +52,17 @@ def test_delete(engine):
         assert repo.delete_recording(s, rec.id) is True
         assert repo.get_recording(s, rec.id) is None
         assert repo.delete_recording(s, "missing") is False
+
+
+def test_update_status_missing_id_raises(engine):
+    from sqlmodel import Session
+    with Session(engine) as s:
+        with pytest.raises(ValueError):
+            repo.update_status(s, "missing", RecordingStatus.DONE)
+
+
+def test_set_transcript_missing_id_raises(engine):
+    from sqlmodel import Session
+    with Session(engine) as s:
+        with pytest.raises(ValueError):
+            repo.set_transcript(s, "missing", {"segments": [], "full_text": "", "language": "ko"})
