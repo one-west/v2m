@@ -120,7 +120,7 @@ def get_prompt(request: Request, rec_id: str):
         rec = _get_or_404(session, rec_id)
         if not rec.transcript:
             raise HTTPException(status_code=409, detail="transcript not ready")
-        return build_prompt(rec.transcript).model_dump()
+        return build_prompt(rec.transcript, rec.meta).model_dump()
 
 
 @router.get("/recordings/{rec_id}/export")
@@ -132,9 +132,9 @@ def export(request: Request, rec_id: str, format: str = "md"):
         if not rec.transcript:
             raise HTTPException(status_code=409, detail="transcript not ready")
         if format == "md":
-            content, media, ext = to_markdown(rec.title, rec.transcript), "text/markdown", "md"
+            content, media, ext = to_markdown(rec.title, rec.transcript, rec.meta), "text/markdown", "md"
         else:
-            content, media, ext = to_txt(rec.title, rec.transcript), "text/plain", "txt"
+            content, media, ext = to_txt(rec.title, rec.transcript, rec.meta), "text/plain", "txt"
     headers = {"Content-Disposition": f'attachment; filename="{rec_id}.{ext}"'}
     return Response(content=content, media_type=media, headers=headers)
 

@@ -7,7 +7,6 @@ INSTRUCTION = (
     "2. 핵심 논의 (주제별 불릿)\n"
     "3. 결정사항 (합의된 사항)\n"
     "4. 액션아이템 (할 일 — 담당자/기한이 언급되면 함께 표기)\n\n"
-    "=== 전사본 ===\n"
 )
 
 
@@ -34,9 +33,25 @@ def format_transcript(transcript: dict) -> str:
     return "\n".join(lines)
 
 
-def build_prompt(transcript: dict, *, too_long_threshold: int = 40000) -> PromptBundle:
+def format_meta(meta) -> str:
+    if not meta:
+        return ""
+    date_time = " ".join(p for p in [meta.get("date", ""), meta.get("time", "")] if p).strip()
+    rows = [
+        ("일자", date_time),
+        ("장소", meta.get("location", "")),
+        ("참석자", meta.get("attendees", "")),
+        ("안건", meta.get("agenda", "")),
+    ]
+    lines = [f"- {label}: {value}" for label, value in rows if value]
+    if not lines:
+        return ""
+    return "=== 회의 정보 ===\n" + "\n".join(lines) + "\n\n"
+
+
+def build_prompt(transcript: dict, meta=None, *, too_long_threshold: int = 40000) -> PromptBundle:
     transcript_text = format_transcript(transcript)
-    prompt = INSTRUCTION + transcript_text
+    prompt = INSTRUCTION + format_meta(meta) + "=== 전사본 ===\n" + transcript_text
     return PromptBundle(
         prompt=prompt,
         transcript_text=transcript_text,

@@ -1,6 +1,6 @@
 import io
 
-from app.prompt.builder import build_prompt, format_transcript
+from app.prompt.builder import build_prompt, format_transcript, format_meta
 
 SAMPLE = {
     "segments": [
@@ -53,3 +53,31 @@ def test_prompt_endpoint_409_when_not_ready(client, engine):
         rec_id = rec.id
     resp = client.get(f"/api/recordings/{rec_id}/prompt")
     assert resp.status_code == 409
+
+
+_META_T = {"segments": [{"speaker": "SPEAKER_00", "start_ms": 0, "end_ms": 1000, "text": "안녕하세요"}],
+           "full_text": "안녕하세요", "language": "ko"}
+
+
+def test_format_meta_omits_empty_fields():
+    out = format_meta({"location": "회의실 A", "attendees": "", "agenda": "킥오프"})
+    assert "회의실 A" in out and "킥오프" in out
+    assert "참석자" not in out  # empty field omitted
+
+
+def test_format_meta_blank_when_none():
+    assert format_meta(None) == ""
+    assert format_meta({"location": ""}) == ""
+
+
+def test_build_prompt_includes_meta_block_before_transcript():
+    bundle = build_prompt(_META_T, meta={"date": "2026-06-23", "time": "14:00", "location": "A"})
+    assert "회의 정보" in bundle.prompt
+    assert bundle.prompt.index("회의 정보") < bundle.prompt.index("안녕하세요")
+    assert "2026-06-23 14:00" in bundle.prompt
+
+
+def test_build_prompt_without_meta_unchanged():
+    bundle = build_prompt(_META_T)
+    assert "회의 정보" not in bundle.prompt
+    assert "안녕하세요" in bundle.prompt
