@@ -14,6 +14,12 @@ class WhisperXTranscriber:
         self.compute_type = compute_type
 
     def transcribe(self, audio_path: Path) -> TranscriptResult:
+        import os
+
+        # Windows: HuggingFace cache uses symlinks, which need Developer Mode or admin.
+        # Without this, model downloads fail with WinError 1314. Copy files instead.
+        os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
+
         import whisperx  # lazy: keeps torch out of test imports
 
         from app.core.paths import get_models_dir
@@ -29,7 +35,15 @@ class WhisperXTranscriber:
         align_model, metadata = whisperx.load_align_model(language_code=language, device=self.device)
         aligned = whisperx.align(result["segments"], align_model, metadata, audio, self.device)
 
-        diarize_model = whisperx.DiarizationPipeline(use_auth_token=self.hf_token, device=self.device)
+        from whisperx.diarize import DiarizationPipeline  # moved out of top-level in whisperx 3.2+
+
+        # Pin to whisperx's current default diarization model. Users must accept its
+        # gated terms once at https://huggingface.co/pyannote/speaker-diarization-community-1
+        diarize_model = DiarizationPipeline(
+            model_name="pyannote/speaker-diarization-community-1",
+            token=self.hf_token,
+            device=self.device,
+        )
         diarize_segments = diarize_model(audio)
         final = whisperx.assign_word_speakers(diarize_segments, aligned)
 

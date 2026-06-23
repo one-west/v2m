@@ -22,7 +22,9 @@ def transcriber():
 @pytest.fixture
 def client(engine, transcriber, tmp_path, monkeypatch):
     monkeypatch.setenv("V2M_DATA_DIR", str(tmp_path / "data"))
-    monkeypatch.delenv("V2M_HF_TOKEN", raising=False)
+    # Force-empty (not delete): an env var overrides any developer-local server/.env file,
+    # so tests stay hermetic regardless of whether a real HF token is configured on disk.
+    monkeypatch.setenv("V2M_HF_TOKEN", "")
     get_settings.cache_clear()
     app = create_app(engine=engine, transcriber=transcriber, shutdown_hook=lambda: None)
     return TestClient(app)

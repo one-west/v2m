@@ -24,7 +24,10 @@ All backend work happens in `server/` with its venv. On Windows use the venv's p
 python run.py                                                  # serve on http://127.0.0.1:<V2M_PORT>
 ```
 
-Tests run **without** `torch`/`whisperx` installed — see the invariant below. Real transcription additionally needs **ffmpeg** on PATH and `V2M_HF_TOKEN` in `server/.env` (accept terms for `pyannote/segmentation-3.0` and `pyannote/speaker-diarization-3.1` on Hugging Face first).
+Tests run **without** `torch`/`whisperx` installed — see the invariant below. Real transcription has extra requirements (verified working end-to-end on Windows, 2026-06):
+- **Python 3.11–3.12 for the `[ml]` extras.** torch / ctranslate2 (via whisperx) have no 3.13/3.14 wheels yet, so the `[ml]` install fails on newer Python. The app + 39-test suite run fine on any 3.11+ (they use the fake transcriber); only real transcription needs a 3.12 venv.
+- **ffmpeg** on PATH — `whisperx.load_audio` shells out to the ffmpeg CLI.
+- `V2M_HF_TOKEN` in `server/.env`, and accept the gated terms for **`pyannote/speaker-diarization-community-1`** on Hugging Face (whisperx's current default diarization model — NOT the older `speaker-diarization-3.1`). `WhisperXTranscriber.transcribe` pins this model and sets `HF_HUB_DISABLE_SYMLINKS=1` so Windows model downloads work without Developer Mode.
 
 ## Architecture (the parts that span files)
 
