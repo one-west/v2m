@@ -1,11 +1,20 @@
 export type RecordingStatus = "recorded" | "transcribing" | "done" | "failed";
 
+export interface MeetingMeta {
+  date?: string;
+  time?: string;
+  location?: string;
+  attendees?: string;
+  agenda?: string;
+}
+
 export interface RecordingSummary {
   id: string;
   title: string;
   status: RecordingStatus;
   created_at: string;
   duration_sec: number | null;
+  meta: MeetingMeta | null;
 }
 
 export interface TranscriptSegment {
@@ -29,6 +38,7 @@ export interface RecordingDetail {
   duration_sec: number | null;
   error: string | null;
   transcript: Transcript | null;
+  meta: MeetingMeta | null;
 }
 
 export interface PromptBundle {

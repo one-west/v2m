@@ -25,16 +25,17 @@ describe("api", () => {
     expect(rows).toEqual([{ id: "1" }]);
   });
 
-  it("uploadRecording POSTs multipart with file and title", async () => {
-    const f = mockFetch({ id: "1", title: "T", status: "recorded", created_at: "x" }, true, 201);
+  it("uploadRecording POSTs multipart with file, title and meta JSON", async () => {
+    const f = mockFetch({ id: "1" }, true, 201);
     vi.stubGlobal("fetch", f);
-    await api.uploadRecording(new Blob(["a"]), "T");
+    await api.uploadRecording(new Blob(["a"]), { title: "T", meta: { location: "A" } });
     const [url, opts] = f.mock.calls[0];
     expect(url).toBe("/api/recordings");
     expect(opts.method).toBe("POST");
-    expect(opts.body).toBeInstanceOf(FormData);
-    expect((opts.body as FormData).get("title")).toBe("T");
-    expect((opts.body as FormData).get("file")).toBeInstanceOf(File);
+    const form = opts.body as FormData;
+    expect(form.get("title")).toBe("T");
+    expect(JSON.parse(form.get("meta") as string)).toEqual({ location: "A" });
+    expect(form.get("file")).toBeInstanceOf(File);
   });
 
   it("retryRecording POSTs retry", async () => {
@@ -53,6 +54,17 @@ describe("api", () => {
   it("throws on non-ok json response", async () => {
     vi.stubGlobal("fetch", mockFetch({}, false, 500));
     await expect(api.listRecordings()).rejects.toThrow(/500/);
+  });
+
+  it("patchRecording PATCHes JSON body", async () => {
+    const f = mockFetch({ id: "1", title: "T2" }, true, 200);
+    vi.stubGlobal("fetch", f);
+    await api.patchRecording("1", { title: "T2", meta: { agenda: "x" } });
+    const [url, opts] = f.mock.calls[0];
+    expect(url).toBe("/api/recordings/1");
+    expect(opts.method).toBe("PATCH");
+    expect(opts.headers["Content-Type"]).toBe("application/json");
+    expect(JSON.parse(opts.body)).toEqual({ title: "T2", meta: { agenda: "x" } });
   });
 
   it("exportUrl builds a query string", () => {
