@@ -1,0 +1,9 @@
+# bkit plugin local state
+.bkit/
+
+# stray Windows reserved-name files
+nul
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db

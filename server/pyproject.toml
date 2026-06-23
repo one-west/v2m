@@ -1,0 +1,26 @@
+[project]
+name = "v2m-server"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlmodel>=0.0.22",
+    "pydantic-settings>=2.4",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+ml = [
+    "whisperx>=3.1",
+    "faster-whisper>=1.0",
+    "torch>=2.2",
+]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

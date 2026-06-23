@@ -1,0 +1,17 @@
+import { describe, it, expect } from "vitest";
+import { msToMmss, statusLabel } from "./format";
+
+describe("format", () => {
+  it("formats ms as mm:ss", () => {
+    expect(msToMmss(0)).toBe("00:00");
+    expect(msToMmss(65000)).toBe("01:05");
+    expect(msToMmss(3599000)).toBe("59:59");
+  });
+
+  it("maps status to Korean labels", () => {
+    expect(statusLabel("recorded")).toBe("대기 중");
+    expect(statusLabel("transcribing")).toBe("전사 중");
+    expect(statusLabel("done")).toBe("완료");
+    expect(statusLabel("failed")).toBe("실패");
+  });
+});
