@@ -32,6 +32,7 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void
   const [title, setTitle] = useState("");
   const [meta, setMeta] = useState<MeetingMeta>({});
   const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saved" | "error">("idle");
   const [reloadToken, setReloadToken] = useState(0);
   const activeRef = useRef(true);
   const timerRef = useRef<number | null>(null);
@@ -73,8 +74,12 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void
 
   async function handleSave() {
     setSaving(true);
+    setSaveState("idle");
     try {
       await patchRecording(id, { title, meta });
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
     } finally {
       setSaving(false);
     }
@@ -90,6 +95,8 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void
           onChange={(next) => { setTitle(next.title); setMeta(next.meta); }} />
         <div className="btn-group">
           <button className="btn btn-secondary" onClick={handleSave} disabled={saving}>저장</button>
+          {saveState === "saved" && <span role="status" className="sub">저장되었습니다</span>}
+          {saveState === "error" && <span role="alert" className="warn-text">저장에 실패했습니다</span>}
         </div>
       </div>
 

@@ -48,6 +48,7 @@ describe("RecordingDetail", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "저장" }));
     expect(patchRecording).toHaveBeenCalledWith("a", { title: "주간회의", meta: { location: "A" } });
+    await waitFor(() => expect(screen.getByText("저장되었습니다")).toBeInTheDocument());
   });
 
   it("shows retry on failed and reloads", async () => {

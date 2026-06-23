@@ -8,8 +8,8 @@ export function msToMmss(ms: number): string {
 }
 
 const STATUS_LABELS: Record<RecordingStatus, string> = {
-  recorded: "대기 중",
-  transcribing: "전사 중",
+  recorded: "대기",
+  transcribing: "전사중",
   done: "완료",
   failed: "실패",
 };
