@@ -1,6 +1,9 @@
 # bkit plugin local state
 .bkit/
 
+# superpowers SDD scratch (briefs, reports, diffs, progress ledger)
+.superpowers/
+
 # stray Windows reserved-name files
 nul
 
