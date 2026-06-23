@@ -2,8 +2,11 @@ import { useState } from "react";
 import { useRecorder } from "../../hooks/useRecorder";
 import { uploadRecording } from "../../lib/api";
 import { msToMmss } from "../../lib/format";
+import type { MeetingMeta } from "../../lib/types";
 
-export function RecorderPanel({ onUploaded }: { onUploaded: () => void }) {
+interface Props { title: string; meta: MeetingMeta; onUploaded: () => void; }
+
+export function RecorderPanel({ title, meta, onUploaded }: Props) {
   const { isRecording, elapsedMs, start, stop } = useRecorder();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +25,7 @@ export function RecorderPanel({ onUploaded }: { onUploaded: () => void }) {
     setError(null);
     try {
       const blob = await stop();
-      await uploadRecording(blob);
+      await uploadRecording(blob, { title, meta });
       onUploaded();
     } catch {
       setError("업로드에 실패했습니다.");
@@ -33,13 +36,14 @@ export function RecorderPanel({ onUploaded }: { onUploaded: () => void }) {
 
   return (
     <div className="recorder">
-      <span className="timer">{msToMmss(elapsedMs)}</span>
+      {isRecording && <span className="rec-dot" aria-hidden="true" />}
+      <span className="timer num">{msToMmss(elapsedMs)}</span>
       {!isRecording ? (
-        <button onClick={handleStart} disabled={busy}>녹음 시작</button>
+        <button className="btn btn-primary" onClick={handleStart} disabled={busy}>녹음 시작</button>
       ) : (
-        <button onClick={handleStop} disabled={busy}>녹음 정지</button>
+        <button className="btn btn-secondary" onClick={handleStop} disabled={busy}>녹음 정지</button>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert" className="warn-text">{error}</p>}
     </div>
   );
 }
