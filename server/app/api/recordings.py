@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, Response, UploadFile
+from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.jobs.queue import run_transcription
@@ -13,6 +14,11 @@ from app.store import repo
 from app.store.models import RecordingStatus
 
 router = APIRouter(prefix="/api")
+
+
+class RecordingPatch(BaseModel):
+    title: str | None = None
+    meta: dict | None = None
 
 
 def _schedule(request: Request, background: BackgroundTasks, rec_id: str) -> None:
@@ -86,6 +92,16 @@ def _get_or_404(session: Session, rec_id: str):
 def get_recording(request: Request, rec_id: str):
     with Session(request.app.state.engine) as session:
         rec = _get_or_404(session, rec_id)
+        return {"id": rec.id, "title": rec.title, "status": rec.status,
+                "created_at": rec.created_at.isoformat(), "duration_sec": rec.duration_sec,
+                "error": rec.error, "transcript": rec.transcript, "meta": rec.meta}
+
+
+@router.patch("/recordings/{rec_id}")
+def patch_recording(request: Request, rec_id: str, body: RecordingPatch):
+    with Session(request.app.state.engine) as session:
+        _get_or_404(session, rec_id)
+        rec = repo.update_recording(session, rec_id, title=body.title, meta=body.meta)
         return {"id": rec.id, "title": rec.title, "status": rec.status,
                 "created_at": rec.created_at.isoformat(), "duration_sec": rec.duration_sec,
                 "error": rec.error, "transcript": rec.transcript, "meta": rec.meta}

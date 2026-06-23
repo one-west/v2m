@@ -60,3 +60,19 @@ def test_list_includes_meta(client):
     _post_with_meta(client, meta={"agenda": "X"})
     rows = client.get("/api/recordings").json()
     assert rows[0]["meta"] == {"agenda": "X"}
+
+
+def test_patch_updates_meta_and_title(client):
+    rec_id = _post_with_meta(client, title="원본").json()["id"]
+    r = client.patch(f"/api/recordings/{rec_id}",
+                      json={"title": "수정본", "meta": {"location": "B룸"}})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["title"] == "수정본"
+    assert body["meta"]["location"] == "B룸"
+    assert "transcript" in body  # full detail shape
+
+
+def test_patch_unknown_id_404(client):
+    r = client.patch("/api/recordings/missing", json={"title": "x"})
+    assert r.status_code == 404
