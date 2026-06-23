@@ -9,8 +9,8 @@ describe("format", () => {
   });
 
   it("maps status to Korean labels", () => {
-    expect(statusLabel("recorded")).toBe("대기 중");
-    expect(statusLabel("transcribing")).toBe("전사 중");
+    expect(statusLabel("recorded")).toBe("대기");
+    expect(statusLabel("transcribing")).toBe("전사중");
     expect(statusLabel("done")).toBe("완료");
     expect(statusLabel("failed")).toBe("실패");
   });
