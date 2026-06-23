@@ -1,0 +1,10 @@
+:root { font-family: system-ui, sans-serif; }
+.app { max-width: 720px; margin: 0 auto; padding: 1.5rem; }
+.badge { padding: 0.1rem 0.5rem; border-radius: 0.5rem; font-size: 0.8rem; }
+.badge-done { background: #d1fae5; }
+.badge-failed { background: #fee2e2; }
+.badge-transcribing, .badge-recorded { background: #e0e7ff; }
+.recording-list { list-style: none; padding: 0; }
+.recording-list li { display: flex; gap: 0.75rem; align-items: center; padding: 0.5rem 0; }
+.transcript .seg { margin-bottom: 0.75rem; }
+.transcript .head { font-weight: 600; color: #4338ca; }
