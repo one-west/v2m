@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RecordingDetail, groupSegments } from "./RecordingDetail";
 
@@ -55,5 +55,32 @@ describe("RecordingDetail", () => {
     await userEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(retryRecording).toHaveBeenCalledWith("a");
     await waitFor(() => expect(screen.getByText("안녕하세요")).toBeInTheDocument());
+  });
+
+  it("polls while transcribing then shows transcript when done", async () => {
+    vi.useFakeTimers();
+    const transcribingDetail = {
+      id: "a", title: "주간회의", status: "transcribing", created_at: "x",
+      duration_sec: 60, error: null, transcript: null,
+    };
+    (getRecording as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(transcribingDetail)
+      .mockResolvedValueOnce(doneDetail);
+
+    render(<RecordingDetail id="a" onBack={vi.fn()} />);
+
+    // Flush the first fetch (microtasks)
+    await act(async () => {});
+    expect(screen.getByText(/잠시만 기다려 주세요/)).toBeInTheDocument();
+
+    // Advance past the poll interval so the setTimeout fires, then flush the second fetch
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    await act(async () => {});
+
+    expect(screen.getByText("안녕하세요")).toBeInTheDocument();
+
+    vi.useRealTimers();
   });
 });

@@ -6,7 +6,7 @@ import { useRecordings } from "./hooks/useRecordings";
 import { deleteRecording } from "./lib/api";
 
 export function App() {
-  const { recordings, refresh } = useRecordings();
+  const { recordings, loading, refresh } = useRecordings();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   async function handleDelete(id: string) {
@@ -29,7 +29,11 @@ export function App() {
       ) : (
         <>
           <RecorderPanel onUploaded={refresh} />
-          <RecordingList recordings={recordings} onSelect={setSelectedId} onDelete={handleDelete} />
+          {loading && recordings.length === 0 ? (
+            <p className="loading">불러오는 중…</p>
+          ) : (
+            <RecordingList recordings={recordings} onSelect={setSelectedId} onDelete={handleDelete} />
+          )}
         </>
       )}
     </main>

@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { exportUrl, getRecording, retryRecording } from "../../lib/api";
 import type { RecordingDetail as Detail, TranscriptSegment } from "../../lib/types";
 import { msToMmss, statusLabel } from "../../lib/format";
 import { StatusBadge } from "./StatusBadge";
 import { CopyForClaude } from "./CopyForClaude";
+
+const POLL_MS = 3000;
 
 interface Group {
   speaker: string;
@@ -26,14 +28,36 @@ export function groupSegments(segments: TranscriptSegment[]): Group[] {
 
 export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [detail, setDetail] = useState<Detail | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+  const activeRef = useRef(true);
+  const timerRef = useRef<number | null>(null);
 
-  async function load() {
-    setDetail(await getRecording(id));
-  }
   useEffect(() => {
+    activeRef.current = true;
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+
+    async function load() {
+      let loaded: Detail;
+      try {
+        loaded = await getRecording(id);
+      } catch {
+        return;
+      }
+      if (!activeRef.current) return;
+      setDetail(loaded);
+      if (loaded.status === "recorded" || loaded.status === "transcribing") {
+        timerRef.current = window.setTimeout(load, POLL_MS);
+      }
+    }
+
     load();
+
+    return () => {
+      activeRef.current = false;
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, reloadToken]);
 
   if (!detail) return <p>불러오는 중…</p>;
 
@@ -49,7 +73,7 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void
           <button
             onClick={async () => {
               await retryRecording(id);
-              load();
+              setReloadToken((t) => t + 1);
             }}
           >
             다시 시도
