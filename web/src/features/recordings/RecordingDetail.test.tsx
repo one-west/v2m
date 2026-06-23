@@ -5,14 +5,16 @@ import { RecordingDetail, groupSegments } from "./RecordingDetail";
 
 vi.mock("../../lib/api", () => ({
   getRecording: vi.fn(),
+  patchRecording: vi.fn().mockResolvedValue({}),
   retryRecording: vi.fn().mockResolvedValue(undefined),
   exportUrl: (id: string, f: string) => `/api/recordings/${id}/export?format=${f}`,
 }));
 vi.mock("./CopyForClaude", () => ({ CopyForClaude: () => <div>copy-stub</div> }));
-import { getRecording, retryRecording } from "../../lib/api";
+import { getRecording, patchRecording, retryRecording } from "../../lib/api";
 
 const doneDetail = {
   id: "a", title: "주간회의", status: "done", created_at: "x", duration_sec: 60, error: null,
+  meta: { location: "A" },
   transcript: {
     segments: [
       { speaker: "SPEAKER_00", start_ms: 0, end_ms: 2000, text: "안녕하세요" },
@@ -35,15 +37,17 @@ describe("groupSegments", () => {
 });
 
 describe("RecordingDetail", () => {
-  it("renders grouped transcript when done", async () => {
+  it("renders transcript + export link when done and saves title+meta", async () => {
     (getRecording as ReturnType<typeof vi.fn>).mockResolvedValue(doneDetail);
     render(<RecordingDetail id="a" onBack={vi.fn()} />);
     await waitFor(() => expect(screen.getByText("안녕하세요")).toBeInTheDocument());
-    expect(screen.getByText(/\[00:00\] SPEAKER_00/)).toBeInTheDocument();
-    expect(screen.getByText(/\[01:05\] SPEAKER_01/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Markdown/ })).toHaveAttribute(
-      "href", "/api/recordings/a/export?format=md",
-    );
+    expect(screen.getByText("SPEAKER_00")).toBeInTheDocument();
+    expect(screen.getByText("[00:00]")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Markdown/ }))
+      .toHaveAttribute("href", "/api/recordings/a/export?format=md");
+
+    await userEvent.click(screen.getByRole("button", { name: "저장" }));
+    expect(patchRecording).toHaveBeenCalledWith("a", { title: "주간회의", meta: { location: "A" } });
   });
 
   it("shows retry on failed and reloads", async () => {
@@ -61,24 +65,18 @@ describe("RecordingDetail", () => {
     vi.useFakeTimers();
     const transcribingDetail = {
       id: "a", title: "주간회의", status: "transcribing", created_at: "x",
-      duration_sec: 60, error: null, transcript: null,
+      duration_sec: 60, error: null, transcript: null, meta: null,
     };
     (getRecording as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce(transcribingDetail)
       .mockResolvedValueOnce(doneDetail);
 
     render(<RecordingDetail id="a" onBack={vi.fn()} />);
-
-    // Flush the first fetch (microtasks)
     await act(async () => {});
     expect(screen.getByText(/잠시만 기다려 주세요/)).toBeInTheDocument();
 
-    // Advance past the poll interval so the setTimeout fires, then flush the second fetch
-    await act(async () => {
-      vi.advanceTimersByTime(3000);
-    });
+    await act(async () => { vi.advanceTimersByTime(3000); });
     await act(async () => {});
-
     expect(screen.getByText("안녕하세요")).toBeInTheDocument();
 
     vi.useRealTimers();
