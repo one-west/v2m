@@ -57,3 +57,18 @@ def delete_recording(session: Session, rec_id: str) -> bool:
     session.delete(rec)
     session.commit()
     return True
+
+
+def update_recording(session: Session, rec_id: str, *, title: Optional[str] = None,
+                     meta: Optional[dict] = None) -> Recording:
+    rec = session.get(Recording, rec_id)
+    if rec is None:
+        raise ValueError(f"recording not found: {rec_id}")
+    if title is not None:
+        rec.title = title
+    if meta is not None:
+        rec.meta = meta
+    session.add(rec)
+    session.commit()
+    session.refresh(rec)
+    return rec

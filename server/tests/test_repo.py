@@ -66,3 +66,30 @@ def test_set_transcript_missing_id_raises(engine):
     with Session(engine) as s:
         with pytest.raises(ValueError):
             repo.set_transcript(s, "missing", {"segments": [], "full_text": "", "language": "ko"})
+
+
+def test_meta_defaults_none_and_roundtrips(engine):
+    with Session(engine) as s:
+        rec = repo.create_recording(s, title="X", audio_path="/x")
+        assert rec.meta is None
+        updated = repo.update_recording(
+            s, rec.id, meta={"location": "회의실 A", "attendees": "홍길동, 김철수"}
+        )
+        assert updated.meta["location"] == "회의실 A"
+        assert repo.get_recording(s, rec.id).meta["attendees"] == "홍길동, 김철수"
+
+
+def test_update_recording_title_only_keeps_meta(engine):
+    with Session(engine) as s:
+        rec = repo.create_recording(s, title="X", audio_path="/x")
+        repo.update_recording(s, rec.id, meta={"agenda": "Q3"})
+        repo.update_recording(s, rec.id, title="새 제목")
+        got = repo.get_recording(s, rec.id)
+        assert got.title == "새 제목"
+        assert got.meta == {"agenda": "Q3"}
+
+
+def test_update_recording_missing_id_raises(engine):
+    with Session(engine) as s:
+        with pytest.raises(ValueError):
+            repo.update_recording(s, "missing", title="x")

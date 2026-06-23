@@ -28,3 +28,4 @@ class Recording(SQLModel, table=True):
     status: RecordingStatus = Field(default=RecordingStatus.RECORDED)
     error: Optional[str] = None
     transcript: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    meta: Optional[dict] = Field(default=None, sa_column=Column(JSON))
