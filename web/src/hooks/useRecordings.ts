@@ -9,18 +9,30 @@ export function useRecordings() {
   const [recordings, setRecordings] = useState<RecordingSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const timerRef = useRef<number | null>(null);
+  // Guard: set to false on unmount so in-flight fetches don't call setState.
+  const activeRef = useRef(true);
 
   const refresh = useCallback(async () => {
     const rows = await listRecordings();
-    setRecordings(rows);
-    setLoading(false);
+    if (activeRef.current) {
+      setRecordings(rows);
+      setLoading(false);
+    }
     return rows;
   }, []);
 
   useEffect(() => {
+    activeRef.current = true;
     let active = true;
     async function tick() {
-      const rows = await refresh().catch(() => [] as RecordingSummary[]);
+      let rows: RecordingSummary[];
+      try {
+        rows = await refresh();
+      } catch {
+        rows = [] as RecordingSummary[];
+        // Ensure loading spinner clears even on first-fetch error.
+        if (activeRef.current) setLoading(false);
+      }
       if (!active) return;
       const busy = rows.some((r) => r.status === "recorded" || r.status === "transcribing");
       timerRef.current = window.setTimeout(tick, busy ? ACTIVE_POLL_MS : IDLE_POLL_MS);
@@ -28,7 +40,8 @@ export function useRecordings() {
     tick();
     return () => {
       active = false;
-      if (timerRef.current) window.clearTimeout(timerRef.current);
+      activeRef.current = false;
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     };
   }, [refresh]);
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 
 vi.mock("../lib/api", () => ({ listRecordings: vi.fn() }));
@@ -26,5 +26,34 @@ describe("useRecordings", () => {
       await result.current.refresh();
     });
     expect(listRecordings).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not call setState after unmount (no act() warning)", async () => {
+    // Use fake timers so the polling setTimeout never fires after unmount.
+    vi.useFakeTimers();
+    // Capture any console.error calls (act() warnings are emitted there).
+    const errorSpy = vi.spyOn(console, "error");
+
+    let resolveFirst!: (v: typeof sample) => void;
+    const pendingFetch = new Promise<typeof sample>((res) => {
+      resolveFirst = res;
+    });
+    (listRecordings as ReturnType<typeof vi.fn>).mockReturnValueOnce(pendingFetch);
+
+    const { unmount } = renderHook(() => useRecordings());
+
+    // Unmount before the in-flight fetch resolves.
+    unmount();
+
+    // Now resolve the fetch — setState must NOT be called.
+    await act(async () => {
+      resolveFirst(sample);
+      // Flush microtasks so the promise chain runs.
+      await Promise.resolve();
+    });
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+    vi.useRealTimers();
   });
 });
