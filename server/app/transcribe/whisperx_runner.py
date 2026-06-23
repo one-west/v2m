@@ -7,11 +7,12 @@ class WhisperXTranscriber:
     """Real local STT + diarization. whisperx/torch imported lazily."""
 
     def __init__(self, model_size: str, hf_token: str, device: str = "cpu",
-                 compute_type: str = "int8") -> None:
+                 compute_type: str = "int8", ffmpeg_dir: str = "") -> None:
         self.model_size = model_size
         self.hf_token = hf_token
         self.device = device
         self.compute_type = compute_type
+        self.ffmpeg_dir = ffmpeg_dir
 
     def transcribe(self, audio_path: Path) -> TranscriptResult:
         import os
@@ -19,6 +20,10 @@ class WhisperXTranscriber:
         # Windows: HuggingFace cache uses symlinks, which need Developer Mode or admin.
         # Without this, model downloads fail with WinError 1314. Copy files instead.
         os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
+
+        # Make ffmpeg discoverable if it is installed somewhere off the system PATH.
+        if self.ffmpeg_dir:
+            os.environ["PATH"] = self.ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
 
         import whisperx  # lazy: keeps torch out of test imports
 

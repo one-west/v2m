@@ -1,0 +1,13 @@
+{
+  "name": "v2m",
+  "private": true,
+  "description": "Run the V2M backend (FastAPI + WhisperX) and frontend (Vite) together for development.",
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "cd server && .venv-ml\\Scripts\\python.exe run.py",
+    "dev:web": "cd web && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

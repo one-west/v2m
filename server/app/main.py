@@ -16,7 +16,11 @@ VERSION = "0.1.0"
 
 def _default_transcriber(settings):
     from app.transcribe.whisperx_runner import WhisperXTranscriber
-    return WhisperXTranscriber(model_size=settings.whisper_model, hf_token=settings.hf_token)
+    return WhisperXTranscriber(
+        model_size=settings.whisper_model,
+        hf_token=settings.hf_token,
+        ffmpeg_dir=settings.ffmpeg_dir,
+    )
 
 
 def _default_shutdown() -> None:

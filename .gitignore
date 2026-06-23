@@ -7,6 +7,16 @@
 # stray Windows reserved-name files
 nul
 
+# root dev launcher deps (concurrently)
+node_modules/
+
+# editor settings
+.vscode/
+.idea/
+
+# logs
+*.log
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

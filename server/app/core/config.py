@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
     language: str = "ko"
+    # Optional dir containing ffmpeg.exe, prepended to PATH at transcribe time.
+    # Use when ffmpeg is installed but not on the system PATH (e.g. winget on Windows).
+    ffmpeg_dir: str = ""
 
 
 @lru_cache

@@ -54,6 +54,21 @@ v2m/
 
 ## 빠른 시작
 
+### 한 번에 실행 (개발) — 권장
+
+루트에서 한 번만 설치하면 백엔드+프론트가 같이 뜹니다.
+
+```bash
+npm install        # 루트: concurrently 설치 (최초 1회)
+npm run dev        # 백엔드(:8000) + 프론트(:5173) 동시 실행
+```
+
+- 백엔드는 **`server/.venv-ml`**(실제 전사용 Python 3.12 venv)로 실행됩니다 — 아래 백엔드 셋업에서
+  `.venv-ml`을 먼저 만들어 두세요. (비-Windows는 `package.json`의 `dev:server` 경로를 `.venv-ml/bin/python`으로 조정)
+- 프론트는 `/api`를 백엔드 `:8000`으로 프록시합니다. 브라우저에서 `http://localhost:5173` 접속.
+
+각각 따로 실행하려면 아래를 참고하세요.
+
 ### 1) 백엔드
 
 ```bash
