@@ -1,4 +1,4 @@
-import type { RecordingStatus } from "./types";
+import type { MeetingMeta, RecordingStatus } from "./types";
 
 export function msToMmss(ms: number): string {
   const total = Math.floor(ms / 1000);
@@ -16,4 +16,9 @@ const STATUS_LABELS: Record<RecordingStatus, string> = {
 
 export function statusLabel(status: RecordingStatus): string {
   return STATUS_LABELS[status];
+}
+
+export function attendeesCount(meta: MeetingMeta | null): number {
+  if (!meta?.attendees) return 0;
+  return meta.attendees.split(",").map((s) => s.trim()).filter(Boolean).length;
 }

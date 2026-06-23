@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { msToMmss, statusLabel } from "./format";
+import { msToMmss, statusLabel, attendeesCount } from "./format";
 
 describe("format", () => {
   it("formats ms as mm:ss", () => {
@@ -13,5 +13,11 @@ describe("format", () => {
     expect(statusLabel("transcribing")).toBe("전사 중");
     expect(statusLabel("done")).toBe("완료");
     expect(statusLabel("failed")).toBe("실패");
+  });
+
+  it("counts comma-separated attendees", () => {
+    expect(attendeesCount(null)).toBe(0);
+    expect(attendeesCount({ attendees: "홍길동, 김철수 ,  " })).toBe(2);
+    expect(attendeesCount({})).toBe(0);
   });
 });

@@ -46,3 +46,15 @@ def test_export_409_when_not_ready(client, engine):
 
 def test_export_404_missing(client):
     assert client.get("/api/recordings/nope/export?format=md").status_code == 404
+
+
+def test_export_includes_meta_block():
+    md = to_markdown("회의", SAMPLE, {"location": "A"})
+    assert "회의 정보" in md and "A" in md
+    txt = to_txt("회의", SAMPLE, {"location": "A"})
+    assert "회의 정보" in txt
+
+
+def test_export_without_meta_has_no_block():
+    assert "회의 정보" not in to_markdown("회의", SAMPLE)
+    assert "회의 정보" not in to_txt("회의", SAMPLE)

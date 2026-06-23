@@ -8,7 +8,7 @@ V2M (Voice to Minutes) — a personal, **local-first, $0** tool: record meeting 
 
 Design rationale and all product decisions live in [docs/superpowers/specs/v2m-voice-to-minutes-design.md](docs/superpowers/specs/v2m-voice-to-minutes-design.md). The backend was built task-by-task from [docs/superpowers/plans/v2m-backend.md](docs/superpowers/plans/v2m-backend.md).
 
-**Status:** backend complete (`server/`). Frontend (browser recorder + transcript UI + claude.ai copy) is **not built yet** — it's "Plan B" and will consume the stable `/api` + `/health` contract.
+**Status:** backend complete (`server/`) and frontend complete (`web/` — Vite + React + TS SPA: browser recorder, meeting-info form, transcript UI, copy-for-claude.ai, md/txt export). The frontend consumes the stable `/api` + `/health` contract and is built to `web/dist` (served at `/`). The backend stores optional meeting metadata (`Recording.meta`) and injects a `회의 정보` block into the prompt/export. Frontend design + plan: [docs/superpowers/specs/v2m-frontend-design.md](docs/superpowers/specs/v2m-frontend-design.md), [docs/superpowers/plans/v2m-frontend.md](docs/superpowers/plans/v2m-frontend.md).
 
 ## Commands
 

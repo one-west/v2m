@@ -1,4 +1,4 @@
-import type { PromptBundle, RecordingDetail, RecordingSummary } from "./types";
+import type { MeetingMeta, PromptBundle, RecordingDetail, RecordingSummary } from "./types";
 
 async function jsonOrThrow<T>(resp: Response): Promise<T> {
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -13,10 +13,27 @@ export async function getRecording(id: string): Promise<RecordingDetail> {
   return jsonOrThrow(await fetch(`/api/recordings/${id}`));
 }
 
-export async function uploadRecording(blob: Blob, title?: string): Promise<RecordingSummary> {
+export async function patchRecording(
+  id: string,
+  body: { title?: string; meta?: MeetingMeta },
+): Promise<RecordingDetail> {
+  return jsonOrThrow(
+    await fetch(`/api/recordings/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+export async function uploadRecording(
+  blob: Blob,
+  opts: { title?: string; meta?: MeetingMeta } = {},
+): Promise<RecordingSummary> {
   const form = new FormData();
   form.append("file", new File([blob], "recording.webm", { type: blob.type || "audio/webm" }));
-  if (title) form.append("title", title);
+  if (opts.title) form.append("title", opts.title);
+  if (opts.meta) form.append("meta", JSON.stringify(opts.meta));
   return jsonOrThrow(await fetch("/api/recordings", { method: "POST", body: form }));
 }
 

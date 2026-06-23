@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { exportUrl, getRecording, retryRecording } from "../../lib/api";
-import type { RecordingDetail as Detail, TranscriptSegment } from "../../lib/types";
+import { exportUrl, getRecording, patchRecording, retryRecording } from "../../lib/api";
+import type { MeetingMeta, RecordingDetail as Detail, TranscriptSegment } from "../../lib/types";
 import { msToMmss, statusLabel } from "../../lib/format";
 import { StatusBadge } from "./StatusBadge";
 import { CopyForClaude } from "./CopyForClaude";
+import { MeetingForm } from "../meeting/MeetingForm";
 
 const POLL_MS = 3000;
 
@@ -28,6 +29,9 @@ export function groupSegments(segments: TranscriptSegment[]): Group[] {
 
 export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [detail, setDetail] = useState<Detail | null>(null);
+  const [title, setTitle] = useState("");
+  const [meta, setMeta] = useState<MeetingMeta>({});
+  const [saving, setSaving] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const activeRef = useRef(true);
   const timerRef = useRef<number | null>(null);
@@ -35,6 +39,7 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void
   useEffect(() => {
     activeRef.current = true;
     if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    let seeded = false;
 
     async function load() {
       let loaded: Detail;
@@ -45,6 +50,11 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void
       }
       if (!activeRef.current) return;
       setDetail(loaded);
+      if (!seeded) {
+        setTitle(loaded.title);
+        setMeta(loaded.meta ?? {});
+        seeded = true;
+      }
       if (loaded.status === "recorded" || loaded.status === "transcribing") {
         timerRef.current = window.setTimeout(load, POLL_MS);
       }
@@ -59,23 +69,35 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, reloadToken]);
 
-  if (!detail) return <p>불러오는 중…</p>;
+  if (!detail) return <p className="empty">불러오는 중…</p>;
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await patchRecording(id, { title, meta });
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="detail">
-      <button onClick={onBack}>← 목록</button>
-      <h2>{detail.title}</h2>
-      <StatusBadge status={detail.status} />
+      <button className="btn btn-secondary" onClick={onBack}>← 목록</button>
+
+      <div className="card">
+        <h2>회의 정보 <StatusBadge status={detail.status} /></h2>
+        <MeetingForm title={title} meta={meta}
+          onChange={(next) => { setTitle(next.title); setMeta(next.meta); }} />
+        <div className="btn-group">
+          <button className="btn btn-secondary" onClick={handleSave} disabled={saving}>저장</button>
+        </div>
+      </div>
 
       {detail.status === "failed" && (
-        <div role="alert">
-          <p>전사 실패: {detail.error}</p>
-          <button
-            onClick={async () => {
-              await retryRecording(id);
-              setReloadToken((t) => t + 1);
-            }}
-          >
+        <div className="card" role="alert">
+          <p className="warn-text">전사 실패: {detail.error}</p>
+          <button className="btn btn-secondary"
+            onClick={async () => { await retryRecording(id); setReloadToken((t) => t + 1); }}>
             다시 시도
           </button>
         </div>
@@ -83,28 +105,35 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void
 
       {detail.status === "done" && detail.transcript && (
         <>
-          <CopyForClaude id={id} />
-          <div className="export">
-            <a href={exportUrl(id, "md")}>Markdown 내보내기</a>
-            <a href={exportUrl(id, "txt")}>TXT 내보내기</a>
+          <div className="card">
+            <h2>회의록 만들기</h2>
+            <p className="sub">전사본과 프롬프트를 복사해 claude.ai 데스크탑 앱에 붙여넣으세요.</p>
+            <CopyForClaude id={id} />
+            <div className="btn-group">
+              <a className="btn btn-secondary" href={exportUrl(id, "md")}>Markdown 내보내기</a>
+              <a className="btn btn-secondary" href={exportUrl(id, "txt")}>TXT 내보내기</a>
+            </div>
           </div>
-          <div className="transcript">
-            {groupSegments(detail.transcript.segments).map((g, i) => (
-              <div className="seg" key={i}>
-                <div className="head">
-                  [{msToMmss(g.startMs)}] {g.speaker}
+
+          <div className="card">
+            <h2>전사본</h2>
+            <div className="transcript">
+              {groupSegments(detail.transcript.segments).map((g, i) => (
+                <div className="seg" key={i}>
+                  <div className="head">
+                    <span className="speaker-chip">{g.speaker}</span>
+                    <span className="ts num">[{msToMmss(g.startMs)}]</span>
+                  </div>
+                  {g.lines.map((line, j) => <p key={j}>{line}</p>)}
                 </div>
-                {g.lines.map((line, j) => (
-                  <p key={j}>{line}</p>
-                ))}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </>
       )}
 
       {(detail.status === "recorded" || detail.status === "transcribing") && (
-        <p>{statusLabel(detail.status)}… 잠시만 기다려 주세요.</p>
+        <p className="empty">{statusLabel(detail.status)}… 잠시만 기다려 주세요.</p>
       )}
     </div>
   );
