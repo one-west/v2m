@@ -1,3 +1,4 @@
+import threading
 import time
 from pathlib import Path
 
@@ -5,7 +6,13 @@ from app.transcribe.base import TranscriptResult, TranscriptSegment
 
 
 class WhisperXTranscriber:
-    """Real local STT + diarization. whisperx/torch imported lazily."""
+    """Real local STT + diarization. whisperx/torch imported lazily.
+
+    The STT model, per-language align models, and the diarization pipeline are
+    loaded once and cached on the instance — create_app builds a single
+    long-lived transcriber, so every recording after the first skips the (slow)
+    model-load step.
+    """
 
     def __init__(self, model_size: str, hf_token: str, device: str = "cpu",
                  compute_type: str = "int8", ffmpeg_dir: str = "",
@@ -17,6 +24,50 @@ class WhisperXTranscriber:
         self.ffmpeg_dir = ffmpeg_dir
         self.batch_size = batch_size
         self.cpu_threads = cpu_threads
+        self._model = None
+        self._align_cache: dict[str, tuple] = {}
+        self._diarize = None
+        self._lock = threading.Lock()
+
+    def _get_model(self):
+        if self._model is None:
+            import whisperx  # lazy: keeps torch out of test imports
+
+            from app.core.paths import get_models_dir
+            with self._lock:
+                if self._model is None:
+                    self._model = whisperx.load_model(
+                        self.model_size, self.device, compute_type=self.compute_type,
+                        threads=self.cpu_threads, download_root=str(get_models_dir()),
+                    )
+        return self._model
+
+    def _get_align(self, language: str):
+        cached = self._align_cache.get(language)
+        if cached is None:
+            import whisperx
+            with self._lock:
+                cached = self._align_cache.get(language)
+                if cached is None:
+                    cached = whisperx.load_align_model(language_code=language, device=self.device)
+                    self._align_cache[language] = cached
+        return cached
+
+    def _get_diarize(self):
+        if self._diarize is None:
+            # moved out of top-level in whisperx 3.2+
+            from whisperx.diarize import DiarizationPipeline
+            with self._lock:
+                if self._diarize is None:
+                    # Pin to whisperx's current default diarization model. Users must accept
+                    # its gated terms once at
+                    # https://huggingface.co/pyannote/speaker-diarization-community-1
+                    self._diarize = DiarizationPipeline(
+                        model_name="pyannote/speaker-diarization-community-1",
+                        token=self.hf_token,
+                        device=self.device,
+                    )
+        return self._diarize
 
     def transcribe(self, audio_path: Path) -> TranscriptResult:
         import os
@@ -31,13 +82,8 @@ class WhisperXTranscriber:
 
         import whisperx  # lazy: keeps torch out of test imports
 
-        from app.core.paths import get_models_dir
-
         t0 = time.perf_counter()
-        model = whisperx.load_model(
-            self.model_size, self.device, compute_type=self.compute_type,
-            threads=self.cpu_threads, download_root=str(get_models_dir()),
-        )
+        model = self._get_model()  # cached after the first recording
         audio = whisperx.load_audio(str(audio_path))
         t_load = time.perf_counter()
         # batch_size is WhisperX's core speedup: VAD-chunked segments run in parallel.
@@ -45,19 +91,11 @@ class WhisperXTranscriber:
         language = result.get("language", "ko")
         t_stt = time.perf_counter()
 
-        align_model, metadata = whisperx.load_align_model(language_code=language, device=self.device)
+        align_model, metadata = self._get_align(language)  # cached per language
         aligned = whisperx.align(result["segments"], align_model, metadata, audio, self.device)
         t_align = time.perf_counter()
 
-        from whisperx.diarize import DiarizationPipeline  # moved out of top-level in whisperx 3.2+
-
-        # Pin to whisperx's current default diarization model. Users must accept its
-        # gated terms once at https://huggingface.co/pyannote/speaker-diarization-community-1
-        diarize_model = DiarizationPipeline(
-            model_name="pyannote/speaker-diarization-community-1",
-            token=self.hf_token,
-            device=self.device,
-        )
+        diarize_model = self._get_diarize()  # cached after the first recording
         diarize_segments = diarize_model(audio)
         final = whisperx.assign_word_speakers(diarize_segments, aligned)
         t_diar = time.perf_counter()
