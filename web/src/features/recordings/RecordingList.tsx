@@ -22,8 +22,10 @@ export function RecordingList({
     <div className="recording-list">
       {recordings.map((r) => (
         <div className="row" key={r.id}>
-          <button className="title" onClick={() => onSelect(r.id)}>{r.title}</button>
-          <span className="sub">{subText(r)}</span>
+          <button className="row-main" aria-label={r.title} onClick={() => onSelect(r.id)}>
+            <span className="title">{r.title}</span>
+            <span className="sub">{subText(r)}</span>
+          </button>
           <StatusBadge status={r.status} />
           <button className="btn btn-danger-ghost" aria-label={`${r.title} 삭제`}
             onClick={() => onDelete(r.id)}>삭제</button>
