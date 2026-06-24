@@ -14,7 +14,7 @@ import { getRecording, patchRecording, retryRecording } from "../../lib/api";
 
 const doneDetail = {
   id: "a", title: "주간회의", status: "done", created_at: "x", duration_sec: 60, error: null,
-  meta: { location: "A" },
+  meta: { location: "A" }, language: "ko",
   transcript: {
     segments: [
       { speaker: "SPEAKER_00", start_ms: 0, end_ms: 2000, text: "안녕하세요" },
@@ -43,6 +43,7 @@ describe("RecordingDetail", () => {
     await waitFor(() => expect(screen.getByText("안녕하세요")).toBeInTheDocument());
     expect(screen.getByText("SPEAKER_00")).toBeInTheDocument();
     expect(screen.getByText("[00:00]")).toBeInTheDocument();
+    expect(screen.getByText("전사 언어: 한국어")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Markdown/ }))
       .toHaveAttribute("href", "/api/recordings/a/export?format=md");
 
