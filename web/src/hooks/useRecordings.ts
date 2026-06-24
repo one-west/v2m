@@ -8,6 +8,7 @@ const IDLE_POLL_MS = 12000;
 export function useRecordings() {
   const [recordings, setRecordings] = useState<RecordingSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const timerRef = useRef<number | null>(null);
   // Guard: set to false on unmount so in-flight fetches don't call setState.
   const activeRef = useRef(true);
@@ -16,6 +17,7 @@ export function useRecordings() {
     const rows = await listRecordings();
     if (activeRef.current) {
       setRecordings(rows);
+      setError(false);
       setLoading(false);
     }
     return rows;
@@ -30,8 +32,11 @@ export function useRecordings() {
         rows = await refresh();
       } catch {
         rows = [] as RecordingSummary[];
-        // Ensure loading spinner clears even on first-fetch error.
-        if (activeRef.current) setLoading(false);
+        // Surface the failure and clear the loading spinner even on first-fetch error.
+        if (activeRef.current) {
+          setError(true);
+          setLoading(false);
+        }
       }
       if (!active) return;
       const busy = rows.some((r) => r.status === "recorded" || r.status === "transcribing");
@@ -45,5 +50,5 @@ export function useRecordings() {
     };
   }, [refresh]);
 
-  return { recordings, loading, refresh };
+  return { recordings, loading, error, refresh };
 }

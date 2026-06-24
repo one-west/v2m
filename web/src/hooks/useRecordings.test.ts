@@ -28,6 +28,25 @@ describe("useRecordings", () => {
     expect(listRecordings).toHaveBeenCalledTimes(2);
   });
 
+  it("surfaces an error flag when the load fails", async () => {
+    (listRecordings as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("boom"));
+    const { result } = renderHook(() => useRecordings());
+    await waitFor(() => expect(result.current.error).toBe(true));
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("clears the error flag once a later load succeeds", async () => {
+    (listRecordings as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValue(sample);
+    const { result } = renderHook(() => useRecordings());
+    await waitFor(() => expect(result.current.error).toBe(true));
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(result.current.error).toBe(false);
+  });
+
   it("does not call setState after unmount (no act() warning)", async () => {
     // Use fake timers so the polling setTimeout never fires after unmount.
     vi.useFakeTimers();
