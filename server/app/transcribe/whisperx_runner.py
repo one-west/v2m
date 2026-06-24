@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 from app.transcribe.base import TranscriptResult, TranscriptSegment
@@ -7,12 +8,15 @@ class WhisperXTranscriber:
     """Real local STT + diarization. whisperx/torch imported lazily."""
 
     def __init__(self, model_size: str, hf_token: str, device: str = "cpu",
-                 compute_type: str = "int8", ffmpeg_dir: str = "") -> None:
+                 compute_type: str = "int8", ffmpeg_dir: str = "",
+                 batch_size: int = 16, cpu_threads: int = 0) -> None:
         self.model_size = model_size
         self.hf_token = hf_token
         self.device = device
         self.compute_type = compute_type
         self.ffmpeg_dir = ffmpeg_dir
+        self.batch_size = batch_size
+        self.cpu_threads = cpu_threads
 
     def transcribe(self, audio_path: Path) -> TranscriptResult:
         import os
@@ -29,16 +33,21 @@ class WhisperXTranscriber:
 
         from app.core.paths import get_models_dir
 
+        t0 = time.perf_counter()
         model = whisperx.load_model(
             self.model_size, self.device, compute_type=self.compute_type,
-            download_root=str(get_models_dir()),
+            threads=self.cpu_threads, download_root=str(get_models_dir()),
         )
         audio = whisperx.load_audio(str(audio_path))
-        result = model.transcribe(audio)
+        t_load = time.perf_counter()
+        # batch_size is WhisperX's core speedup: VAD-chunked segments run in parallel.
+        result = model.transcribe(audio, batch_size=self.batch_size)
         language = result.get("language", "ko")
+        t_stt = time.perf_counter()
 
         align_model, metadata = whisperx.load_align_model(language_code=language, device=self.device)
         aligned = whisperx.align(result["segments"], align_model, metadata, audio, self.device)
+        t_align = time.perf_counter()
 
         from whisperx.diarize import DiarizationPipeline  # moved out of top-level in whisperx 3.2+
 
@@ -51,6 +60,16 @@ class WhisperXTranscriber:
         )
         diarize_segments = diarize_model(audio)
         final = whisperx.assign_word_speakers(diarize_segments, aligned)
+        t_diar = time.perf_counter()
+
+        print(
+            f"[v2m.transcribe] model={self.model_size} batch={self.batch_size} "
+            f"threads={self.cpu_threads or 'auto'} lang={language} | "
+            f"load+decode={t_load - t0:.1f}s stt={t_stt - t_load:.1f}s "
+            f"align={t_align - t_stt:.1f}s diarize={t_diar - t_align:.1f}s "
+            f"total={t_diar - t0:.1f}s",
+            flush=True,
+        )
 
         segments: list[TranscriptSegment] = []
         texts: list[str] = []

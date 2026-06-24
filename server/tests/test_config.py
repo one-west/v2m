@@ -8,14 +8,20 @@ def test_defaults():
     assert s.port == 8000
     assert s.language == "ko"
     assert s.hf_token == ""
+    assert s.batch_size == 16
+    assert s.cpu_threads == 0
 
 
 def test_env_override(monkeypatch):
     monkeypatch.setenv("V2M_WHISPER_MODEL", "small")
     monkeypatch.setenv("V2M_PORT", "9001")
+    monkeypatch.setenv("V2M_BATCH_SIZE", "8")
+    monkeypatch.setenv("V2M_CPU_THREADS", "6")
     s = Settings(_env_file=None)
     assert s.whisper_model == "small"
     assert s.port == 9001
+    assert s.batch_size == 8
+    assert s.cpu_threads == 6
 
 
 def test_get_settings_is_cached():
