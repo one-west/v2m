@@ -15,6 +15,22 @@ def get_engine(db_path: Optional[Path] = None) -> Engine:
 
 def init_db(engine: Engine) -> None:
     SQLModel.metadata.create_all(engine)
+    _migrate_recording_columns(engine)
+
+
+# Forward-only, idempotent column adds for tables that predate a new field.
+# `create_all` only creates MISSING tables — it never alters an existing one —
+# so a DB created before a column was added needs the column backfilled here.
+# (Single-user local SQLite; no Alembic.) Maps model field -> SQLite DDL type.
+_RECORDING_ADDED_COLUMNS = {"meta": "JSON"}
+
+
+def _migrate_recording_columns(engine: Engine) -> None:
+    with engine.begin() as conn:
+        existing = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(recording)")}
+        for name, ddl_type in _RECORDING_ADDED_COLUMNS.items():
+            if name not in existing:
+                conn.exec_driver_sql(f"ALTER TABLE recording ADD COLUMN {name} {ddl_type}")
 
 
 @contextmanager
