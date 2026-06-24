@@ -51,6 +51,17 @@ describe("RecordingDetail", () => {
     await waitFor(() => expect(screen.getByText("저장되었습니다")).toBeInTheDocument());
   });
 
+  it("shows a no-speech notice (not transcript/copy) when done with 0 segments", async () => {
+    (getRecording as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...doneDetail,
+      transcript: { segments: [], full_text: "", language: "ko" },
+    });
+    render(<RecordingDetail id="a" onBack={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText(/음성이 감지되지 않았습니다/)).toBeInTheDocument());
+    expect(screen.queryByText("전사본")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Markdown/ })).not.toBeInTheDocument();
+  });
+
   it("shows retry on failed and reloads", async () => {
     (getRecording as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({ ...doneDetail, status: "failed", transcript: null, error: "boom" })

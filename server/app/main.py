@@ -22,6 +22,7 @@ def _default_transcriber(settings):
         ffmpeg_dir=settings.ffmpeg_dir,
         batch_size=settings.batch_size,
         cpu_threads=settings.cpu_threads,
+        language=settings.language,
     )
 
 

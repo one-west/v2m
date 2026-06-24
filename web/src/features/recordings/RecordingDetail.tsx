@@ -110,7 +110,7 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void
         </div>
       )}
 
-      {detail.status === "done" && detail.transcript && (
+      {detail.status === "done" && detail.transcript && detail.transcript.segments.length > 0 && (
         <>
           <div className="card">
             <h2>회의록 만들기</h2>
@@ -137,6 +137,12 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void
             </div>
           </div>
         </>
+      )}
+
+      {detail.status === "done" && detail.transcript && detail.transcript.segments.length === 0 && (
+        <div className="card" role="alert">
+          <p className="warn-text">음성이 감지되지 않았습니다. 녹음이 무음이거나 소리가 너무 작을 수 있어요 — 다시 녹음해 주세요.</p>
+        </div>
       )}
 
       {(detail.status === "recorded" || detail.status === "transcribing") && (
