@@ -35,6 +35,7 @@ def test_init_db_adds_missing_meta_column(tmp_path):
         rows = repo.list_recordings(s)  # the exact query that 500'd before the fix
         assert len(rows) == 1
         assert rows[0].meta is None
+        assert rows[0].language is None  # second backfilled column
         repo.update_recording(s, "old1", meta={"location": "A"})
         assert repo.get_recording(s, "old1").meta == {"location": "A"}
 

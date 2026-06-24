@@ -62,6 +62,22 @@ def test_list_includes_meta(client):
     assert rows[0]["meta"] == {"agenda": "X"}
 
 
+def test_post_stores_and_returns_language(client):
+    files = {"file": ("recording.webm", io.BytesIO(b"a"), "audio/webm")}
+    r = client.post("/api/recordings", files=files, data={"title": "회의", "language": "en"})
+    assert r.status_code == 201
+    rec_id = r.json()["id"]
+    assert r.json()["language"] == "en"
+    assert client.get(f"/api/recordings/{rec_id}").json()["language"] == "en"
+    assert client.get("/api/recordings").json()[0]["language"] == "en"
+
+
+def test_post_without_language_is_null(client):
+    files = {"file": ("recording.webm", io.BytesIO(b"a"), "audio/webm")}
+    r = client.post("/api/recordings", files=files, data={"title": "회의"})
+    assert r.json()["language"] is None
+
+
 def test_patch_updates_meta_and_title(client):
     rec_id = _post_with_meta(client, title="원본").json()["id"]
     r = client.patch(f"/api/recordings/{rec_id}",

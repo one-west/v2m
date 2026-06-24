@@ -30,7 +30,7 @@ def test_success_path_sets_done_with_transcript(engine):
 
 def test_failure_path_sets_failed_with_error(engine):
     class Boom:
-        def transcribe(self, audio_path):
+        def transcribe(self, audio_path, language=None):
             raise RuntimeError("model exploded")
 
     with Session(engine) as s:
@@ -43,3 +43,14 @@ def test_failure_path_sets_failed_with_error(engine):
         updated = repo.get_recording(s, rec_id)
         assert updated.status == RecordingStatus.FAILED
         assert "model exploded" in updated.error
+
+
+def test_passes_recording_language_to_transcriber(engine):
+    with Session(engine) as s:
+        rec = repo.create_recording(s, title="X", audio_path="/x.webm", language="en")
+        rec_id = rec.id
+
+    fake = FakeTranscriber()
+    run_transcription(rec_id, transcriber=fake, engine=engine)
+
+    assert fake.last_language == "en"

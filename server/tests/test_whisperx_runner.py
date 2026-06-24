@@ -41,6 +41,12 @@ def test_transcribe_forces_configured_language_and_maps_segments(monkeypatch, tm
     result = t.transcribe(Path("dummy.webm"))
 
     assert captured["language"] == "ko"  # forced, not auto-detected
+    # Per-recording override beats the configured default.
+    t.transcribe(Path("dummy.webm"), language="en")
+    assert captured["language"] == "en"
+    # "auto" => let WhisperX detect.
+    t.transcribe(Path("dummy.webm"), language="auto")
+    assert captured["language"] is None
     assert captured["batch_size"] == 8
     assert result.language == "ko"
     assert [s.text for s in result.segments] == ["안녕"]

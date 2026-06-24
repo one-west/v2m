@@ -17,8 +17,15 @@ def test_create_and_get(engine):
         rec = repo.create_recording(s, title="Standup", audio_path="/a/b.webm")
         assert rec.id
         assert rec.status == RecordingStatus.RECORDED
+        assert rec.language is None
         fetched = repo.get_recording(s, rec.id)
         assert fetched.title == "Standup"
+
+
+def test_create_with_language(engine):
+    with Session(engine) as s:
+        rec = repo.create_recording(s, title="Sync", audio_path="/a.webm", language="en")
+        assert repo.get_recording(s, rec.id).language == "en"
 
 
 def test_list_newest_first(engine):
