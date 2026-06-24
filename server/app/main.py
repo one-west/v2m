@@ -20,6 +20,8 @@ def _default_transcriber(settings):
         model_size=settings.whisper_model,
         hf_token=settings.hf_token,
         ffmpeg_dir=settings.ffmpeg_dir,
+        batch_size=settings.batch_size,
+        cpu_threads=settings.cpu_threads,
     )
 
 

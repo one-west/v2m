@@ -7,6 +7,19 @@ def test_whisperx_module_imports_without_torch():
     assert hasattr(mod, "WhisperXTranscriber")
 
 
+def test_whisperx_transcriber_stores_perf_params_without_torch():
+    # Constructing the real transcriber must stay torch-free and carry the perf knobs.
+    from app.transcribe.whisperx_runner import WhisperXTranscriber
+
+    t = WhisperXTranscriber(model_size="small", hf_token="", batch_size=8, cpu_threads=4)
+    assert t.batch_size == 8
+    assert t.cpu_threads == 4
+    # Defaults: batched + auto threads.
+    d = WhisperXTranscriber(model_size="small", hf_token="")
+    assert d.batch_size == 16
+    assert d.cpu_threads == 0
+
+
 def test_shutdown_endpoint_exists(client):
     resp = client.post("/shutdown")
     assert resp.status_code == 200
