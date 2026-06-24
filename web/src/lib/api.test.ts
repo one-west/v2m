@@ -28,13 +28,14 @@ describe("api", () => {
   it("uploadRecording POSTs multipart with file, title and meta JSON", async () => {
     const f = mockFetch({ id: "1" }, true, 201);
     vi.stubGlobal("fetch", f);
-    await api.uploadRecording(new Blob(["a"]), { title: "T", meta: { location: "A" } });
+    await api.uploadRecording(new Blob(["a"]), { title: "T", meta: { location: "A" }, language: "en" });
     const [url, opts] = f.mock.calls[0];
     expect(url).toBe("/api/recordings");
     expect(opts.method).toBe("POST");
     const form = opts.body as FormData;
     expect(form.get("title")).toBe("T");
     expect(JSON.parse(form.get("meta") as string)).toEqual({ location: "A" });
+    expect(form.get("language")).toBe("en");
     expect(form.get("file")).toBeInstanceOf(File);
   });
 

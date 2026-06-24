@@ -1,6 +1,7 @@
 import threading
 import time
 from pathlib import Path
+from typing import Optional
 
 from app.transcribe.base import TranscriptResult, TranscriptSegment
 
@@ -73,7 +74,7 @@ class WhisperXTranscriber:
                     )
         return self._diarize
 
-    def transcribe(self, audio_path: Path) -> TranscriptResult:
+    def transcribe(self, audio_path: Path, language: Optional[str] = None) -> TranscriptResult:
         import os
 
         # Windows: HuggingFace cache uses symlinks, which need Developer Mode or admin.
@@ -91,10 +92,13 @@ class WhisperXTranscriber:
         audio = whisperx.load_audio(str(audio_path))
         t_load = time.perf_counter()
         # batch_size is WhisperX's core speedup: VAD-chunked segments run in parallel.
-        # language forces transcription + alignment (None => auto-detect).
-        forced = self.language or None
+        # Per-recording `language` overrides the configured default; "auto"/empty/None
+        # (with no configured default) => let WhisperX detect.
+        chosen = language if language is not None else self.language
+        auto = chosen in (None, "", "auto")
+        forced = None if auto else chosen
         result = model.transcribe(audio, batch_size=self.batch_size, language=forced)
-        language = self.language or result.get("language", "ko")
+        language = (result.get("language", "ko") if auto else chosen) or "ko"
         t_stt = time.perf_counter()
 
         align_model, metadata = self._get_align(language)  # cached per language

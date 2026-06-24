@@ -29,3 +29,6 @@ class Recording(SQLModel, table=True):
     error: Optional[str] = None
     transcript: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     meta: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    # Per-recording transcription language: "ko"/"en"/… to force, "auto" to detect,
+    # None for older rows (transcriber falls back to the configured V2M_LANGUAGE).
+    language: Optional[str] = Field(default=None)

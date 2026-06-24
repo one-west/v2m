@@ -18,19 +18,19 @@ beforeEach(() => {
 
 describe("RecorderPanel", () => {
   it("starts recording on click", async () => {
-    render(<RecorderPanel title="회의" meta={{}} onUploaded={vi.fn()} />);
+    render(<RecorderPanel title="회의" meta={{}} language="ko" onUploaded={vi.fn()} />);
     await userEvent.click(screen.getByRole("button", { name: "녹음 시작" }));
     expect(startMock).toHaveBeenCalled();
   });
 
-  it("uploads with title+meta and notifies on stop", async () => {
+  it("uploads with title+meta+language and notifies on stop", async () => {
     recorderState.isRecording = true;
     const onUploaded = vi.fn();
-    render(<RecorderPanel title="회의" meta={{ location: "A" }} onUploaded={onUploaded} />);
+    render(<RecorderPanel title="회의" meta={{ location: "A" }} language="en" onUploaded={onUploaded} />);
     await userEvent.click(screen.getByRole("button", { name: "녹음 정지" }));
     await waitFor(() => expect(uploadRecording).toHaveBeenCalled());
     const [, opts] = (uploadRecording as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(opts).toEqual({ title: "회의", meta: { location: "A" } });
+    expect(opts).toEqual({ title: "회의", meta: { location: "A" }, language: "en" });
     expect(onUploaded).toHaveBeenCalled();
   });
 });

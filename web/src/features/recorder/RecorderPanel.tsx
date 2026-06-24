@@ -4,9 +4,9 @@ import { uploadRecording } from "../../lib/api";
 import { msToMmss } from "../../lib/format";
 import type { MeetingMeta } from "../../lib/types";
 
-interface Props { title: string; meta: MeetingMeta; onUploaded: () => void; }
+interface Props { title: string; meta: MeetingMeta; language: string; onUploaded: () => void; }
 
-export function RecorderPanel({ title, meta, onUploaded }: Props) {
+export function RecorderPanel({ title, meta, language, onUploaded }: Props) {
   const { isRecording, elapsedMs, start, stop } = useRecorder();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export function RecorderPanel({ title, meta, onUploaded }: Props) {
     setError(null);
     try {
       const blob = await stop();
-      await uploadRecording(blob, { title, meta });
+      await uploadRecording(blob, { title, meta, language });
       onUploaded();
     } catch {
       setError("업로드에 실패했습니다.");

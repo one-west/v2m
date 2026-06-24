@@ -7,8 +7,10 @@ from app.store.models import Recording, RecordingStatus
 
 
 def create_recording(session: Session, *, title: str, audio_path: str,
-                     duration_sec: Optional[int] = None) -> Recording:
-    rec = Recording(title=title, audio_path=audio_path, duration_sec=duration_sec)
+                     duration_sec: Optional[int] = None,
+                     language: Optional[str] = None) -> Recording:
+    rec = Recording(title=title, audio_path=audio_path, duration_sec=duration_sec,
+                    language=language)
     session.add(rec)
     session.commit()
     session.refresh(rec)

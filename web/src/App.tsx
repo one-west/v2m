@@ -12,6 +12,7 @@ export function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftMeta, setDraftMeta] = useState<MeetingMeta>({});
+  const [draftLanguage, setDraftLanguage] = useState("ko");
 
   async function handleDelete(id: string) {
     await deleteRecording(id);
@@ -22,6 +23,7 @@ export function App() {
   function handleUploaded() {
     setDraftTitle("");
     setDraftMeta({});
+    setDraftLanguage("ko");
     refresh();
   }
 
@@ -42,7 +44,17 @@ export function App() {
               <h2>새 회의</h2>
               <MeetingForm title={draftTitle} meta={draftMeta}
                 onChange={(next) => { setDraftTitle(next.title); setDraftMeta(next.meta); }} />
-              <RecorderPanel title={draftTitle} meta={draftMeta} onUploaded={handleUploaded} />
+              <div className="field" style={{ marginTop: 14, maxWidth: 220 }}>
+                <label htmlFor="rec-lang">전사 언어</label>
+                <select id="rec-lang" value={draftLanguage}
+                  onChange={(e) => setDraftLanguage(e.target.value)}>
+                  <option value="ko">한국어</option>
+                  <option value="en">English</option>
+                  <option value="auto">자동 감지</option>
+                </select>
+              </div>
+              <RecorderPanel title={draftTitle} meta={draftMeta} language={draftLanguage}
+                onUploaded={handleUploaded} />
             </div>
             <div className="card">
               <h2>회의 목록</h2>
