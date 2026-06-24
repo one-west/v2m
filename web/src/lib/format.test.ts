@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { msToMmss, statusLabel, attendeesCount } from "./format";
+import { msToMmss, statusLabel, attendeesCount, languageLabel } from "./format";
 
 describe("format", () => {
   it("formats ms as mm:ss", () => {
@@ -19,5 +19,13 @@ describe("format", () => {
     expect(attendeesCount(null)).toBe(0);
     expect(attendeesCount({ attendees: "홍길동, 김철수 ,  " })).toBe(2);
     expect(attendeesCount({})).toBe(0);
+  });
+
+  it("maps language codes to labels", () => {
+    expect(languageLabel("ko")).toBe("한국어");
+    expect(languageLabel("en")).toBe("English");
+    expect(languageLabel("auto")).toBe("자동 감지");
+    expect(languageLabel(null)).toBeNull();
+    expect(languageLabel("fr")).toBe("fr"); // unknown -> passthrough
   });
 });

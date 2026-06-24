@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { exportUrl, getRecording, patchRecording, retryRecording } from "../../lib/api";
 import type { MeetingMeta, RecordingDetail as Detail, TranscriptSegment } from "../../lib/types";
-import { msToMmss, statusLabel } from "../../lib/format";
+import { languageLabel, msToMmss, statusLabel } from "../../lib/format";
 import { StatusBadge } from "./StatusBadge";
 import { CopyForClaude } from "./CopyForClaude";
 import { MeetingForm } from "../meeting/MeetingForm";
@@ -98,6 +98,9 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void
           {saveState === "saved" && <span role="status" className="sub">저장되었습니다</span>}
           {saveState === "error" && <span role="alert" className="warn-text">저장에 실패했습니다</span>}
         </div>
+        {languageLabel(detail.language) && (
+          <p className="sub" style={{ marginTop: 10 }}>전사 언어: {languageLabel(detail.language)}</p>
+        )}
       </div>
 
       {detail.status === "failed" && (

@@ -22,3 +22,14 @@ export function attendeesCount(meta: MeetingMeta | null): number {
   if (!meta?.attendees) return 0;
   return meta.attendees.split(",").map((s) => s.trim()).filter(Boolean).length;
 }
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  ko: "한국어",
+  en: "English",
+  auto: "자동 감지",
+};
+
+export function languageLabel(language: string | null): string | null {
+  if (!language) return null;
+  return LANGUAGE_LABELS[language] ?? language;
+}
