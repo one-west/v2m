@@ -12,16 +12,30 @@ Design rationale and all product decisions live in [docs/superpowers/specs/v2m-v
 
 ## Commands
 
-All backend work happens in `server/` with its venv. On Windows use the venv's python explicitly (do not rely on a globally-activated env):
+**One-command dev (recommended):** from the repo root, `npm install` once, then `npm run dev` runs backend (`:8000`) + frontend (`:5173`) together via `concurrently`. The launcher runs the backend with `server/.venv-ml` (the Python 3.12 real-transcription venv) — create that venv first (see README).
+
+### Backend (`server/`, with its venv)
+
+On Windows use the venv's python explicitly (do not rely on a globally-activated env):
 
 ```bash
 # from server/
-.venv/Scripts/python.exe -m pytest -q                         # full suite (39 tests)
+.venv/Scripts/python.exe -m pytest -q                         # full suite (53 tests)
 .venv/Scripts/python.exe -m pytest tests/test_repo.py -v       # one file
 .venv/Scripts/python.exe -m pytest tests/test_jobs.py::test_success_path_sets_done_with_transcript -v  # one test
 .venv/Scripts/python.exe -m pip install -e ".[dev]"            # base + dev deps (NO torch — tests don't need it)
 .venv/Scripts/python.exe -m pip install -e ".[dev,ml]"         # add whisperx/torch for REAL transcription
 python run.py                                                  # serve on http://127.0.0.1:<V2M_PORT>
+```
+
+### Frontend (`web/`)
+
+```bash
+# from web/
+npm test                              # full Vitest suite (27 tests)
+npm test -- src/features/recordings   # subset (path filter; Vitest does NOT type-check)
+npm run build                         # tsc --noEmit (type gate) + vite build → web/dist (backend serves at /)
+npm run dev                           # Vite dev server :5173, proxies /api + /health to :8000
 ```
 
 Tests run **without** `torch`/`whisperx` installed — see the invariant below. Real transcription has extra requirements (verified working end-to-end on Windows, 2026-06):
@@ -37,9 +51,11 @@ Tests run **without** `torch`/`whisperx` installed — see the invariant below. 
 
 **Ingest → background job → read pipeline:** `POST /api/recordings` (`app/api/recordings.py`) saves audio to the app-data dir, creates a `Recording` row (status `recorded`), and schedules `run_transcription` via FastAPI `BackgroundTasks` using `request.app.state.transcriber`/`engine`. `app/jobs/queue.py::run_transcription` drives the state machine `recorded → transcribing → done|failed`, **opens a fresh DB session per phase** (so no SQLite connection is held during the long transcribe call), catches all exceptions into `failed`+error, and never raises. Note: under `TestClient`, BackgroundTasks run synchronously after the POST response, which is why tests can assert `status == "done"` right after upload.
 
-**Status state machine** (`app/store/models.py` `RecordingStatus`): `recorded`/`transcribing`/`done`/`failed`. Transcript is stored as a JSON dict (`{segments:[{speaker,start_ms,end_ms,text}], full_text, language}`) on the `Recording` row. Repo functions (`app/store/repo.py`) each take a `Session`; `set_transcript` also flips status to `done`.
+**Status state machine** (`app/store/models.py` `RecordingStatus`): `recorded`/`transcribing`/`done`/`failed`. Transcript is stored as a JSON dict (`{segments:[{speaker,start_ms,end_ms,text}], full_text, language}`) on the `Recording` row. The row also carries optional meeting metadata `meta` (a JSON dict: `{date,time,location,attendees,agenda}`, all optional) — fully backward-compatible (`None` by default). Repo functions (`app/store/repo.py`) each take a `Session`; `set_transcript` also flips status to `done`; `update_recording(*, title=None, meta=None)` applies only the non-`None` fields (backs the `PATCH /api/recordings/{id}` edit endpoint).
 
-**The product's "minutes" step is external.** The app does NOT call any LLM. `app/prompt/builder.py` formats the transcript (consecutive same-speaker segments grouped under `[mm:ss] SPEAKER_xx:` headers) and bundles it with a Korean meeting-minutes instruction; `GET /api/recordings/{id}/prompt` returns this for the user to paste into claude.ai. `app/export/markdown.py` exports the transcript as md/txt (reusing `format_transcript`). There is intentionally no in-app minutes storage.
+**The product's "minutes" step is external.** The app does NOT call any LLM. `app/prompt/builder.py` formats the transcript (consecutive same-speaker segments grouped under `[mm:ss] SPEAKER_xx:` headers) and bundles it with a Korean meeting-minutes instruction; when `meta` is present, `format_meta` injects a `=== 회의 정보 ===` block between the instruction and the transcript so claude.ai sees the meeting context. `GET /api/recordings/{id}/prompt` returns this bundle for the user to paste into the claude.ai desktop app. `app/export/markdown.py` exports the transcript (+ meta block) as md/txt (reusing `format_transcript`/`format_meta`). There is intentionally no in-app minutes storage.
+
+**Frontend SPA** (`web/`, Vite + React + TS, no router/state libraries): view state is just `'home' ↔ {detailId}` in `App.tsx`. A typed `lib/api.ts` wraps the `/api` contract with `fetch` (relative paths only); `useRecorder` captures `audio/webm;codecs=opus` via `MediaRecorder`; `useRecordings` lists + adaptively polls (3s while any row is active, else 12s); `RecordingDetail` independently polls its own status (3s while `recorded`/`transcribing`, unmount-guarded) and seeds its editable form once per load so polls don't clobber edits. The shared `MeetingForm` drives both the home "새 회의" draft and the detail edit (→ `PATCH`). **`CopyForClaude` is copy-only — it writes the prompt bundle to the clipboard and shows a toast; it deliberately never opens claude.ai** (the design mandates pasting into the desktop app). Styling lives in `web/src/styles.css` as design-system CSS variables (single font, no monospace) — see [docs/superpowers/specs/v2m-frontend-design.md](docs/superpowers/specs/v2m-frontend-design.md) and [.superdesign/design-system.md](.superdesign/design-system.md).
 
 **Config & data location** (`app/core/config.py`, `app/core/paths.py`): settings come from `.env` with the `V2M_` prefix (`V2M_HF_TOKEN`, `V2M_WHISPER_MODEL` default `medium`, `V2M_HOST`, `V2M_PORT`, `V2M_LANGUAGE`). All writable data (SQLite, audio, models, logs) lives under `%LOCALAPPDATA%\v2m\` (override with `V2M_DATA_DIR`), **never** next to the executable — `get_data_dir()` is deliberately uncached so tests can repoint it per-test.
 

@@ -14,8 +14,8 @@ node_modules/
 .vscode/
 .idea/
 
-# Claude Code per-user local settings (shareable .claude/ config stays trackable)
-.claude/settings.local.json
+# Claude Code local settings/state
+.claude/
 
 # logs
 *.log
