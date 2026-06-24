@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
@@ -22,4 +22,4 @@ class TranscriptResult(BaseModel):
 
 @runtime_checkable
 class Transcriber(Protocol):
-    def transcribe(self, audio_path: Path) -> TranscriptResult: ...
+    def transcribe(self, audio_path: Path, language: Optional[str] = None) -> TranscriptResult: ...

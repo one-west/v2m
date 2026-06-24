@@ -17,7 +17,9 @@ class FakeTranscriber:
     def __init__(self, result: Optional[TranscriptResult] = None) -> None:
         self._result = result or _DEFAULT
         self.last_audio_path: Optional[Path] = None
+        self.last_language: Optional[str] = None
 
-    def transcribe(self, audio_path: Path) -> TranscriptResult:
+    def transcribe(self, audio_path: Path, language: Optional[str] = None) -> TranscriptResult:
         self.last_audio_path = audio_path
+        self.last_language = language
         return self._result

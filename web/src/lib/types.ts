@@ -15,6 +15,7 @@ export interface RecordingSummary {
   created_at: string;
   duration_sec: number | null;
   meta: MeetingMeta | null;
+  language: string | null;
 }
 
 export interface TranscriptSegment {
@@ -39,6 +40,7 @@ export interface RecordingDetail {
   error: string | null;
   transcript: Transcript | null;
   meta: MeetingMeta | null;
+  language: string | null;
 }
 
 export interface PromptBundle {

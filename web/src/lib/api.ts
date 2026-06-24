@@ -28,12 +28,13 @@ export async function patchRecording(
 
 export async function uploadRecording(
   blob: Blob,
-  opts: { title?: string; meta?: MeetingMeta } = {},
+  opts: { title?: string; meta?: MeetingMeta; language?: string } = {},
 ): Promise<RecordingSummary> {
   const form = new FormData();
   form.append("file", new File([blob], "recording.webm", { type: blob.type || "audio/webm" }));
   if (opts.title) form.append("title", opts.title);
   if (opts.meta) form.append("meta", JSON.stringify(opts.meta));
+  if (opts.language) form.append("language", opts.language);
   return jsonOrThrow(await fetch("/api/recordings", { method: "POST", body: form }));
 }
 

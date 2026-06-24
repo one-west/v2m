@@ -14,8 +14,9 @@ def run_transcription(rec_id: str, *, transcriber: Transcriber, engine) -> None:
             return
         repo.update_status(session, rec_id, RecordingStatus.TRANSCRIBING)
         audio_path = Path(rec.audio_path)
+        language = rec.language
     try:
-        result = transcriber.transcribe(audio_path)
+        result = transcriber.transcribe(audio_path, language=language)
     except Exception as exc:  # noqa: BLE001 - job must never raise
         with Session(engine) as session:
             repo.update_status(session, rec_id, RecordingStatus.FAILED, error=str(exc))
