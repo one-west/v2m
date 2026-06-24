@@ -28,4 +28,11 @@ describe("RecordingList", () => {
     await userEvent.click(screen.getByRole("button", { name: "스프린트 삭제" }));
     expect(onDelete).toHaveBeenCalledWith("b");
   });
+
+  it("selects when clicking the row body (sub text), not only the title", async () => {
+    const onSelect = vi.fn();
+    render(<RecordingList recordings={rows} onSelect={onSelect} onDelete={vi.fn()} />);
+    await userEvent.click(screen.getByText(/참석 2명/));
+    expect(onSelect).toHaveBeenCalledWith("a");
+  });
 });

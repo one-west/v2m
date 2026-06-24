@@ -96,8 +96,12 @@ input:focus, textarea:focus {
 .recording-list { display: flex; flex-direction: column; }
 .row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .row:hover { background: var(--surface-2); }
-.row .title { background: none; border: none; color: var(--text); font: inherit; font-weight: 600;
-  cursor: pointer; text-align: left; }
+/* The whole title+sub area is one click target (not just the title text). */
+.row-main { flex: 1; display: flex; align-items: baseline; gap: 12px;
+  background: none; border: none; color: inherit; font: inherit; cursor: pointer;
+  text-align: left; padding: 8px 4px; margin: -8px -4px; border-radius: var(--r-field); }
+.row-main:hover .title { color: var(--accent-bright); }
+.row .title { color: var(--text); font-weight: 600; }
 .row .sub { color: var(--muted); font-size: 13px; flex: 1; }
 .empty { color: var(--muted); padding: 16px 0; }
 

@@ -8,7 +8,7 @@ from sqlmodel import Session
 
 from app.jobs.queue import run_transcription
 from app.core.paths import get_audio_dir
-from app.export.markdown import to_markdown, to_txt
+from app.export.markdown import content_disposition, to_markdown, to_txt
 from app.prompt.builder import build_prompt
 from app.store import repo
 from app.store.models import RecordingStatus
@@ -135,7 +135,7 @@ def export(request: Request, rec_id: str, format: str = "md"):
             content, media, ext = to_markdown(rec.title, rec.transcript, rec.meta), "text/markdown", "md"
         else:
             content, media, ext = to_txt(rec.title, rec.transcript, rec.meta), "text/plain", "txt"
-    headers = {"Content-Disposition": f'attachment; filename="{rec_id}.{ext}"'}
+    headers = {"Content-Disposition": content_disposition(rec.title, ext, rec_id)}
     return Response(content=content, media_type=media, headers=headers)
 
 
