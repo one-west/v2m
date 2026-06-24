@@ -8,7 +8,7 @@ import { deleteRecording } from "./lib/api";
 import type { MeetingMeta } from "./lib/types";
 
 export function App() {
-  const { recordings, loading, refresh } = useRecordings();
+  const { recordings, loading, error, refresh } = useRecordings();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftMeta, setDraftMeta] = useState<MeetingMeta>({});
@@ -46,7 +46,11 @@ export function App() {
             </div>
             <div className="card">
               <h2>회의 목록</h2>
-              {loading && recordings.length === 0 ? (
+              {error ? (
+                <p role="alert" className="warn-text">
+                  목록을 불러오지 못했습니다. 백엔드 서버가 실행 중인지 확인해 주세요.
+                </p>
+              ) : loading && recordings.length === 0 ? (
                 <p className="empty">불러오는 중…</p>
               ) : (
                 <RecordingList recordings={recordings} onSelect={setSelectedId} onDelete={handleDelete} />
