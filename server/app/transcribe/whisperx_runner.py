@@ -16,7 +16,7 @@ class WhisperXTranscriber:
 
     def __init__(self, model_size: str, hf_token: str, device: str = "cpu",
                  compute_type: str = "int8", ffmpeg_dir: str = "",
-                 batch_size: int = 16, cpu_threads: int = 0) -> None:
+                 batch_size: int = 16, cpu_threads: int = 0, language: str = "ko") -> None:
         self.model_size = model_size
         self.hf_token = hf_token
         self.device = device
@@ -24,6 +24,10 @@ class WhisperXTranscriber:
         self.ffmpeg_dir = ffmpeg_dir
         self.batch_size = batch_size
         self.cpu_threads = cpu_threads
+        # Force this language instead of letting WhisperX auto-detect (which can
+        # misfire on quiet/short Korean audio, e.g. detect 'uk' and yield 0 segments).
+        # Empty string -> fall back to auto-detect.
+        self.language = language
         self._model = None
         self._align_cache: dict[str, tuple] = {}
         self._diarize = None
@@ -87,8 +91,10 @@ class WhisperXTranscriber:
         audio = whisperx.load_audio(str(audio_path))
         t_load = time.perf_counter()
         # batch_size is WhisperX's core speedup: VAD-chunked segments run in parallel.
-        result = model.transcribe(audio, batch_size=self.batch_size)
-        language = result.get("language", "ko")
+        # language forces transcription + alignment (None => auto-detect).
+        forced = self.language or None
+        result = model.transcribe(audio, batch_size=self.batch_size, language=forced)
+        language = self.language or result.get("language", "ko")
         t_stt = time.perf_counter()
 
         align_model, metadata = self._get_align(language)  # cached per language
