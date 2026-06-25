@@ -9,13 +9,16 @@ export interface UseRecorder {
   stop: () => Promise<Blob>;
 }
 
-export function useRecorder(): UseRecorder {
+export function useRecorder(opts: { onChunk?: (blob: Blob) => void } = {}): UseRecorder {
   const [isRecording, setIsRecording] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const startedAtRef = useRef(0);
+  // Kept in a ref so `start`'s identity stays stable across renders.
+  const onChunkRef = useRef(opts.onChunk);
+  onChunkRef.current = opts.onChunk;
 
   const start = useCallback(async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -23,7 +26,10 @@ export function useRecorder(): UseRecorder {
     const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
     chunksRef.current = [];
     rec.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data);
+      if (e.data.size > 0) {
+        chunksRef.current.push(e.data);
+        onChunkRef.current?.(e.data);
+      }
     };
     rec.start(1000);
     recorderRef.current = rec;

@@ -3,6 +3,7 @@ import { useRecorder } from "../../hooks/useRecorder";
 import { useBeforeUnloadGuard } from "../../hooks/useBeforeUnloadGuard";
 import { uploadRecording } from "../../lib/api";
 import { msToMmss } from "../../lib/format";
+import { appendChunk, beginSession, clearSession } from "../../lib/recordingStore";
 import type { MeetingMeta } from "../../lib/types";
 
 interface Props {
@@ -14,7 +15,10 @@ interface Props {
 }
 
 export function RecorderPanel({ title, meta, language, onUploaded, onRecordingChange }: Props) {
-  const { isRecording, elapsedMs, start, stop } = useRecorder();
+  // Persist each chunk to IndexedDB so the recording survives a reload (sleep/crash).
+  const { isRecording, elapsedMs, start, stop } = useRecorder({
+    onChunk: (blob) => { appendChunk(blob).catch(() => {}); },
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +31,8 @@ export function RecorderPanel({ title, meta, language, onUploaded, onRecordingCh
   async function handleStart() {
     setError(null);
     try {
+      // Snapshot the meeting fields so a recovered recording uploads with them.
+      await beginSession({ title, meta, language }).catch(() => {});
       await start();
     } catch {
       setError("마이크 권한이 필요합니다.");
@@ -39,6 +45,7 @@ export function RecorderPanel({ title, meta, language, onUploaded, onRecordingCh
     try {
       const blob = await stop();
       await uploadRecording(blob, { title, meta, language });
+      await clearSession().catch(() => {}); // uploaded -> drop the durable buffer
       onUploaded();
     } catch {
       setError("업로드에 실패했습니다.");

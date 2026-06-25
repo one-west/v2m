@@ -48,4 +48,14 @@ describe("useRecorder", () => {
     expect(result.current.isRecording).toBe(false);
     expect(blob.size).toBeGreaterThan(0);
   });
+
+  it("forwards each chunk to onChunk for durable buffering", async () => {
+    const onChunk = vi.fn();
+    const { result } = renderHook(() => useRecorder({ onChunk }));
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(onChunk).toHaveBeenCalledTimes(1);
+    expect(onChunk.mock.calls[0][0].size).toBeGreaterThan(0);
+  });
 });
