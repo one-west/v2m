@@ -1,15 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRecorder } from "../../hooks/useRecorder";
+import { useBeforeUnloadGuard } from "../../hooks/useBeforeUnloadGuard";
 import { uploadRecording } from "../../lib/api";
 import { msToMmss } from "../../lib/format";
 import type { MeetingMeta } from "../../lib/types";
 
-interface Props { title: string; meta: MeetingMeta; language: string; onUploaded: () => void; }
+interface Props {
+  title: string;
+  meta: MeetingMeta;
+  language: string;
+  onUploaded: () => void;
+  onRecordingChange?: (recording: boolean) => void;
+}
 
-export function RecorderPanel({ title, meta, language, onUploaded }: Props) {
+export function RecorderPanel({ title, meta, language, onUploaded, onRecordingChange }: Props) {
   const { isRecording, elapsedMs, start, stop } = useRecorder();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Warn before refresh / close / navigate while a recording is in progress or
+  // its upload hasn't finished, so the in-memory audio isn't silently lost.
+  const inProgress = isRecording || busy;
+  useBeforeUnloadGuard(inProgress);
+  useEffect(() => { onRecordingChange?.(isRecording); }, [isRecording, onRecordingChange]);
 
   async function handleStart() {
     setError(null);

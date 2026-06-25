@@ -17,12 +17,14 @@ vi.mock("./lib/api", () => ({
   exportUrl: vi.fn().mockReturnValue("#"),
   retryRecording: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock("./hooks/useRecorder", () => ({
-  useRecorder: () => ({ isRecording: false, elapsedMs: 0, start: vi.fn(), stop: vi.fn() }),
-}));
+const recorderState = { isRecording: false, elapsedMs: 0, start: vi.fn(), stop: vi.fn() };
+vi.mock("./hooks/useRecorder", () => ({ useRecorder: () => recorderState }));
 vi.mock("./features/recordings/CopyForClaude", () => ({ CopyForClaude: () => <div>copy</div> }));
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  recorderState.isRecording = false;
+});
 
 describe("App", () => {
   it("shows home (new-meeting + list), then opens detail on select", async () => {
@@ -35,5 +37,19 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("button", { name: "주간회의" }));
     await waitFor(() => expect(screen.getByText("안녕")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "← 목록" })).toBeInTheDocument();
+  });
+
+  it("confirms before navigating away while recording, and stays if declined", async () => {
+    recorderState.isRecording = true;
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "주간회의" })).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "주간회의" }));
+    expect(confirmSpy).toHaveBeenCalled();
+    // Declined -> stayed on home (no detail view).
+    expect(screen.queryByRole("button", { name: "← 목록" })).not.toBeInTheDocument();
+    expect(screen.getByText("새 회의")).toBeInTheDocument();
+    confirmSpy.mockRestore();
   });
 });
