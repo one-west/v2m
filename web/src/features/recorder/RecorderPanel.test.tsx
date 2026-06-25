@@ -1,44 +1,35 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RecorderPanel } from "./RecorderPanel";
 
-const startMock = vi.fn().mockResolvedValue(undefined);
-const stopMock = vi.fn().mockResolvedValue(new Blob(["x"]));
-const recorderState = { isRecording: false, elapsedMs: 0, start: startMock, stop: stopMock };
+const base = {
+  isRecording: false,
+  elapsedMs: 0,
+  busy: false,
+  error: null as string | null,
+  onStart: vi.fn(),
+  onStop: vi.fn(),
+};
 
-vi.mock("../../hooks/useRecorder", () => ({ useRecorder: () => recorderState }));
-vi.mock("../../lib/api", () => ({ uploadRecording: vi.fn().mockResolvedValue({ id: "1" }) }));
-vi.mock("../../lib/recordingStore", () => ({
-  beginSession: vi.fn().mockResolvedValue(undefined),
-  appendChunk: vi.fn().mockResolvedValue(undefined),
-  clearSession: vi.fn().mockResolvedValue(undefined),
-}));
-import { uploadRecording } from "../../lib/api";
-import { beginSession, clearSession } from "../../lib/recordingStore";
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  recorderState.isRecording = false;
-});
-
-describe("RecorderPanel", () => {
-  it("starts recording on click and opens a durable session", async () => {
-    render(<RecorderPanel title="회의" meta={{}} language="ko" onUploaded={vi.fn()} />);
+describe("RecorderPanel (presentational)", () => {
+  it("fires onStart when idle", async () => {
+    const onStart = vi.fn();
+    render(<RecorderPanel {...base} onStart={onStart} />);
     await userEvent.click(screen.getByRole("button", { name: "녹음 시작" }));
-    expect(startMock).toHaveBeenCalled();
-    expect(beginSession).toHaveBeenCalledWith({ title: "회의", meta: {}, language: "ko" });
+    expect(onStart).toHaveBeenCalled();
   });
 
-  it("uploads with title+meta+language and notifies on stop", async () => {
-    recorderState.isRecording = true;
-    const onUploaded = vi.fn();
-    render(<RecorderPanel title="회의" meta={{ location: "A" }} language="en" onUploaded={onUploaded} />);
+  it("shows the timer + stop button and fires onStop while recording", async () => {
+    const onStop = vi.fn();
+    render(<RecorderPanel {...base} isRecording elapsedMs={65000} onStop={onStop} />);
+    expect(screen.getByText("01:05")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "녹음 정지" }));
-    await waitFor(() => expect(uploadRecording).toHaveBeenCalled());
-    const [, opts] = (uploadRecording as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(opts).toEqual({ title: "회의", meta: { location: "A" }, language: "en" });
-    expect(onUploaded).toHaveBeenCalled();
-    expect(clearSession).toHaveBeenCalled(); // buffer dropped after successful upload
+    expect(onStop).toHaveBeenCalled();
+  });
+
+  it("renders an error", () => {
+    render(<RecorderPanel {...base} error="업로드에 실패했습니다." />);
+    expect(screen.getByRole("alert")).toHaveTextContent("업로드에 실패했습니다.");
   });
 });
