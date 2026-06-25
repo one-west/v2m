@@ -23,6 +23,8 @@ vi.mock("./features/recordings/CopyForClaude", () => ({ CopyForClaude: () => <di
 vi.mock("./lib/recordingStore", () => ({
   getPendingSession: vi.fn().mockResolvedValue(null),
   clearSession: vi.fn().mockResolvedValue(undefined),
+  beginSession: vi.fn().mockResolvedValue(undefined),
+  appendChunk: vi.fn().mockResolvedValue(undefined),
 }));
 import { uploadRecording } from "./lib/api";
 import { getPendingSession } from "./lib/recordingStore";
@@ -46,18 +48,18 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "← 목록" })).toBeInTheDocument();
   });
 
-  it("confirms before navigating away while recording, and stays if declined", async () => {
+  it("keeps recording while navigating to a detail view (no stop, shows top-bar 정지)", async () => {
     recorderState.isRecording = true;
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<App />);
     await waitFor(() => expect(screen.getByRole("button", { name: "주간회의" })).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "주간회의" }));
-    expect(confirmSpy).toHaveBeenCalled();
-    // Declined -> stayed on home (no detail view).
-    expect(screen.queryByRole("button", { name: "← 목록" })).not.toBeInTheDocument();
-    expect(screen.getByText("새 회의")).toBeInTheDocument();
-    confirmSpy.mockRestore();
+    await waitFor(() => expect(screen.getByRole("button", { name: "← 목록" })).toBeInTheDocument());
+
+    // Recording continues across the in-tab navigation: never stopped, and the
+    // persistent top-bar 정지 control is shown on the detail view.
+    expect(recorderState.stop).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "정지" })).toBeInTheDocument();
   });
 
   it("offers to recover a buffered recording and uploads it", async () => {

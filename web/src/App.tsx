@@ -4,8 +4,11 @@ import { RecorderPanel } from "./features/recorder/RecorderPanel";
 import { RecordingList } from "./features/recordings/RecordingList";
 import { RecordingDetail } from "./features/recordings/RecordingDetail";
 import { useRecordings } from "./hooks/useRecordings";
+import { useRecorder } from "./hooks/useRecorder";
+import { useBeforeUnloadGuard } from "./hooks/useBeforeUnloadGuard";
 import { deleteRecording, uploadRecording } from "./lib/api";
-import { clearSession, getPendingSession, type PendingSession } from "./lib/recordingStore";
+import { appendChunk, beginSession, clearSession, getPendingSession, type PendingSession } from "./lib/recordingStore";
+import { msToMmss } from "./lib/format";
 import type { MeetingMeta } from "./lib/types";
 
 export function App() {
@@ -14,15 +17,50 @@ export function App() {
   const [draftTitle, setDraftTitle] = useState("");
   const [draftMeta, setDraftMeta] = useState<MeetingMeta>({});
   const [draftLanguage, setDraftLanguage] = useState("ko");
-  const [recording, setRecording] = useState(false);
   const [pending, setPending] = useState<PendingSession | null>(null);
   const [recovering, setRecovering] = useState(false);
 
-  // On load (e.g. after a sleep/refresh that dropped an in-progress recording),
-  // surface any buffered recording so it can be recovered instead of lost.
+  // The recorder lives in App (not RecorderPanel) so it keeps running while the
+  // user navigates between views inside the tab — MediaRecorder isn't unmounted.
+  const { isRecording, elapsedMs, start, stop } = useRecorder({
+    onChunk: (blob) => { appendChunk(blob).catch(() => {}); },
+  });
+  const [busy, setBusy] = useState(false);
+  const [recError, setRecError] = useState<string | null>(null);
+  useBeforeUnloadGuard(isRecording || busy);
+
+  // On load, surface any recording buffered before a sleep/refresh dropped the tab.
   useEffect(() => {
     getPendingSession().then(setPending).catch(() => {});
   }, []);
+
+  async function handleStart() {
+    setRecError(null);
+    try {
+      await beginSession({ title: draftTitle, meta: draftMeta, language: draftLanguage }).catch(() => {});
+      await start();
+    } catch {
+      setRecError("마이크 권한이 필요합니다.");
+    }
+  }
+
+  async function handleStop() {
+    setBusy(true);
+    setRecError(null);
+    try {
+      const blob = await stop();
+      await uploadRecording(blob, { title: draftTitle, meta: draftMeta, language: draftLanguage });
+      await clearSession().catch(() => {});
+      setDraftTitle("");
+      setDraftMeta({});
+      setDraftLanguage("ko");
+      refresh();
+    } catch {
+      setRecError("업로드에 실패했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleRecover() {
     if (!pending) return;
@@ -52,27 +90,19 @@ export function App() {
     refresh();
   }
 
-  function handleSelect(id: string) {
-    // Leaving the recorder view mid-recording unmounts it and loses the audio.
-    if (recording && !window.confirm("녹음 중입니다. 페이지를 이동하면 진행 중인 녹음이 사라집니다. 이동할까요?")) {
-      return;
-    }
-    setSelectedId(id);
-  }
-
-  function handleUploaded() {
-    setDraftTitle("");
-    setDraftMeta({});
-    setDraftLanguage("ko");
-    refresh();
-  }
-
   return (
     <>
       <header className="topbar">
         <span className="logo">V</span>
         <h1 className="wordmark">V2M</h1>
         <span className="tagline">음성에서 회의록까지</span>
+        {isRecording && selectedId && (
+          <span className="rec-indicator">
+            <span className="rec-dot" aria-hidden="true" />
+            <span className="num">{msToMmss(elapsedMs)}</span>
+            <button className="btn btn-secondary" onClick={handleStop} disabled={busy}>정지</button>
+          </span>
+        )}
       </header>
       <main className="container">
         {pending && (
@@ -93,8 +123,7 @@ export function App() {
           </div>
         )}
         {selectedId ? (
-          <RecordingDetail id={selectedId}
-            onBack={() => { setSelectedId(null); refresh(); }} />
+          <RecordingDetail id={selectedId} onBack={() => { setSelectedId(null); refresh(); }} />
         ) : (
           <>
             <div className="card">
@@ -110,8 +139,8 @@ export function App() {
                   <option value="auto">자동 감지</option>
                 </select>
               </div>
-              <RecorderPanel title={draftTitle} meta={draftMeta} language={draftLanguage}
-                onUploaded={handleUploaded} onRecordingChange={setRecording} />
+              <RecorderPanel isRecording={isRecording} elapsedMs={elapsedMs} busy={busy}
+                error={recError} onStart={handleStart} onStop={handleStop} />
             </div>
             <div className="card">
               <h2>회의 목록</h2>
@@ -122,7 +151,7 @@ export function App() {
               ) : loading && recordings.length === 0 ? (
                 <p className="empty">불러오는 중…</p>
               ) : (
-                <RecordingList recordings={recordings} onSelect={handleSelect} onDelete={handleDelete} />
+                <RecordingList recordings={recordings} onSelect={setSelectedId} onDelete={handleDelete} />
               )}
             </div>
           </>
