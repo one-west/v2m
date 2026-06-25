@@ -9,7 +9,13 @@ const recorderState = { isRecording: false, elapsedMs: 0, start: startMock, stop
 
 vi.mock("../../hooks/useRecorder", () => ({ useRecorder: () => recorderState }));
 vi.mock("../../lib/api", () => ({ uploadRecording: vi.fn().mockResolvedValue({ id: "1" }) }));
+vi.mock("../../lib/recordingStore", () => ({
+  beginSession: vi.fn().mockResolvedValue(undefined),
+  appendChunk: vi.fn().mockResolvedValue(undefined),
+  clearSession: vi.fn().mockResolvedValue(undefined),
+}));
 import { uploadRecording } from "../../lib/api";
+import { beginSession, clearSession } from "../../lib/recordingStore";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -17,10 +23,11 @@ beforeEach(() => {
 });
 
 describe("RecorderPanel", () => {
-  it("starts recording on click", async () => {
+  it("starts recording on click and opens a durable session", async () => {
     render(<RecorderPanel title="회의" meta={{}} language="ko" onUploaded={vi.fn()} />);
     await userEvent.click(screen.getByRole("button", { name: "녹음 시작" }));
     expect(startMock).toHaveBeenCalled();
+    expect(beginSession).toHaveBeenCalledWith({ title: "회의", meta: {}, language: "ko" });
   });
 
   it("uploads with title+meta+language and notifies on stop", async () => {
@@ -32,5 +39,6 @@ describe("RecorderPanel", () => {
     const [, opts] = (uploadRecording as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(opts).toEqual({ title: "회의", meta: { location: "A" }, language: "en" });
     expect(onUploaded).toHaveBeenCalled();
+    expect(clearSession).toHaveBeenCalled(); // buffer dropped after successful upload
   });
 });
