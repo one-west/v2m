@@ -13,11 +13,20 @@ export function App() {
   const [draftTitle, setDraftTitle] = useState("");
   const [draftMeta, setDraftMeta] = useState<MeetingMeta>({});
   const [draftLanguage, setDraftLanguage] = useState("ko");
+  const [recording, setRecording] = useState(false);
 
   async function handleDelete(id: string) {
     await deleteRecording(id);
     if (selectedId === id) setSelectedId(null);
     refresh();
+  }
+
+  function handleSelect(id: string) {
+    // Leaving the recorder view mid-recording unmounts it and loses the audio.
+    if (recording && !window.confirm("녹음 중입니다. 페이지를 이동하면 진행 중인 녹음이 사라집니다. 이동할까요?")) {
+      return;
+    }
+    setSelectedId(id);
   }
 
   function handleUploaded() {
@@ -54,7 +63,7 @@ export function App() {
                 </select>
               </div>
               <RecorderPanel title={draftTitle} meta={draftMeta} language={draftLanguage}
-                onUploaded={handleUploaded} />
+                onUploaded={handleUploaded} onRecordingChange={setRecording} />
             </div>
             <div className="card">
               <h2>회의 목록</h2>
@@ -65,7 +74,7 @@ export function App() {
               ) : loading && recordings.length === 0 ? (
                 <p className="empty">불러오는 중…</p>
               ) : (
-                <RecordingList recordings={recordings} onSelect={setSelectedId} onDelete={handleDelete} />
+                <RecordingList recordings={recordings} onSelect={handleSelect} onDelete={handleDelete} />
               )}
             </div>
           </>
