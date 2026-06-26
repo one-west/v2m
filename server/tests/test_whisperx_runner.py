@@ -142,6 +142,49 @@ def test_get_model_omits_empty_initial_prompt(monkeypatch, tmp_path):
     assert captured["asr_options"] == {"suppress_numerals": False}
 
 
+def test_transcribe_is_serialized(monkeypatch, tmp_path):
+    """Concurrent transcriptions must not overlap on the shared whisperx pipeline
+    (overlap raced into 'NoneType' object has no attribute 'sot_sequence')."""
+    import threading
+    import time
+
+    monkeypatch.setenv("V2M_DATA_DIR", str(tmp_path))
+    state = {"active": 0, "peak": 0}
+    guard = threading.Lock()
+
+    class _FakeModel:
+        def transcribe(self, audio, batch_size=None, language=None):
+            with guard:
+                state["active"] += 1
+                state["peak"] = max(state["peak"], state["active"])
+            time.sleep(0.05)
+            with guard:
+                state["active"] -= 1
+            return {"segments": [], "language": "ko"}
+
+    fake_wx = types.ModuleType("whisperx")
+    fake_wx.load_model = lambda *a, **k: _FakeModel()
+    fake_wx.load_audio = lambda p: [0.0]
+    fake_wx.load_align_model = lambda language_code, device: ("A", "M")
+    fake_wx.align = lambda *a, **k: {"segments": []}
+    fake_wx.assign_word_speakers = lambda d, a: {"segments": []}
+    fake_diarize = types.ModuleType("whisperx.diarize")
+    fake_diarize.DiarizationPipeline = type(
+        "D", (), {"__init__": lambda self, *a, **k: None, "__call__": lambda self, a: "D"}
+    )
+    monkeypatch.setitem(sys.modules, "whisperx", fake_wx)
+    monkeypatch.setitem(sys.modules, "whisperx.diarize", fake_diarize)
+
+    t = WhisperXTranscriber(model_size="small", hf_token="")
+    threads = [threading.Thread(target=lambda: t.transcribe(Path("x.webm"))) for _ in range(4)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+
+    assert state["peak"] == 1  # serialized — never two at once
+
+
 def test_align_cache_is_per_language(monkeypatch, tmp_path):
     monkeypatch.setenv("V2M_DATA_DIR", str(tmp_path))
     count = {"align": 0}

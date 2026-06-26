@@ -36,6 +36,11 @@ class WhisperXTranscriber:
         self._align_cache: dict[str, tuple] = {}
         self._diarize = None
         self._lock = threading.Lock()
+        # Separate from _lock (which guards lazy model init): serializes whole
+        # transcriptions, because the shared whisperx pipeline mutates/resets its
+        # self.tokenizer per call — concurrent runs race into
+        # "'NoneType' object has no attribute 'sot_sequence'".
+        self._transcribe_lock = threading.Lock()
 
     def _get_model(self):
         if self._model is None:
@@ -83,6 +88,12 @@ class WhisperXTranscriber:
 
     def transcribe(self, audio_path: Path, language: Optional[str] = None,
                    on_stage=None) -> TranscriptResult:
+        # Only one transcription at a time on this shared instance (see _transcribe_lock).
+        with self._transcribe_lock:
+            return self._run(audio_path, language=language, on_stage=on_stage)
+
+    def _run(self, audio_path: Path, language: Optional[str] = None,
+             on_stage=None) -> TranscriptResult:
         import os
 
         def stage(name: str) -> None:
