@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     batch_size: int = 16
     # ctranslate2 CPU threads; 0 = auto-detect all physical cores.
     cpu_threads: int = 0
+    # Transcribe spoken numbers as words ("천만원") instead of digits — fewer
+    # number misrecognitions in Korean meetings.
+    suppress_numerals: bool = True
+    # Optional decoder priming text (domain terms / spelling hints). Empty = none.
+    initial_prompt: str = ""
     # Optional dir containing ffmpeg.exe, prepended to PATH at transcribe time.
     # Use when ffmpeg is installed but not on the system PATH (e.g. winget on Windows).
     ffmpeg_dir: str = ""

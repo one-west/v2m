@@ -23,6 +23,8 @@ def _default_transcriber(settings):
         batch_size=settings.batch_size,
         cpu_threads=settings.cpu_threads,
         language=settings.language,
+        suppress_numerals=settings.suppress_numerals,
+        initial_prompt=settings.initial_prompt,
     )
 
 

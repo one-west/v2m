@@ -16,11 +16,13 @@ def test_whisperx_transcriber_stores_perf_params_without_torch():
     assert t.batch_size == 8
     assert t.cpu_threads == 4
     assert t.language == "en"
-    # Defaults: batched + auto threads + Korean.
+    # Defaults: batched + auto threads + Korean + numeral suppression on, no prompt.
     d = WhisperXTranscriber(model_size="small", hf_token="")
     assert d.batch_size == 16
     assert d.cpu_threads == 0
     assert d.language == "ko"
+    assert d.suppress_numerals is True
+    assert d.initial_prompt == ""
 
 
 def test_shutdown_endpoint_exists(client):
