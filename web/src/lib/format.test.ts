@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { msToMmss, statusLabel, attendeesCount, languageLabel } from "./format";
+import { msToMmss, statusLabel, attendeesCount, languageLabel, stageLabel } from "./format";
 
 describe("format", () => {
   it("formats ms as mm:ss", () => {
@@ -27,5 +27,13 @@ describe("format", () => {
     expect(languageLabel("auto")).toBe("자동 감지");
     expect(languageLabel(null)).toBeNull();
     expect(languageLabel("fr")).toBe("fr"); // unknown -> passthrough
+  });
+
+  it("maps transcription stages to labels", () => {
+    expect(stageLabel("loading")).toBe("모델 로딩");
+    expect(stageLabel("transcribing")).toBe("음성 인식");
+    expect(stageLabel("aligning")).toBe("정렬");
+    expect(stageLabel("diarizing")).toBe("화자 분리");
+    expect(stageLabel(null)).toBeNull();
   });
 });

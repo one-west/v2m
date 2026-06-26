@@ -38,8 +38,10 @@ def test_transcribe_forces_configured_language_and_maps_segments(monkeypatch, tm
     monkeypatch.setitem(sys.modules, "whisperx.diarize", fake_diarize)
 
     t = WhisperXTranscriber(model_size="small", hf_token="", language="ko", batch_size=8)
-    result = t.transcribe(Path("dummy.webm"))
+    stages: list[str] = []
+    result = t.transcribe(Path("dummy.webm"), on_stage=stages.append)
 
+    assert stages == ["loading", "transcribing", "aligning", "diarizing"]
     assert captured["language"] == "ko"  # forced, not auto-detected
     # Per-recording override beats the configured default.
     t.transcribe(Path("dummy.webm"), language="en")

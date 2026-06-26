@@ -15,6 +15,7 @@ ml = [
     "whisperx>=3.1",
     "faster-whisper>=1.0",
     "torch>=2.2",
+    "hf_xet>=1.0",  # faster, more resilient HuggingFace model downloads
 ]
 dev = [
     "pytest>=8.0",

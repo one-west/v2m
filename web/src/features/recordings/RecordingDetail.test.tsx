@@ -52,6 +52,15 @@ describe("RecordingDetail", () => {
     await waitFor(() => expect(screen.getByText("저장되었습니다")).toBeInTheDocument());
   });
 
+  it("shows the current transcription stage while transcribing", async () => {
+    (getRecording as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "a", title: "주간회의", status: "transcribing", created_at: "x", duration_sec: 60,
+      error: null, meta: null, language: "ko", stage: "diarizing", transcript: null,
+    });
+    render(<RecordingDetail id="a" onBack={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText(/화자 분리/)).toBeInTheDocument());
+  });
+
   it("shows a no-speech notice (not transcript/copy) when done with 0 segments", async () => {
     (getRecording as ReturnType<typeof vi.fn>).mockResolvedValue({
       ...doneDetail,

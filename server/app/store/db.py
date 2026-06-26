@@ -22,7 +22,7 @@ def init_db(engine: Engine) -> None:
 # `create_all` only creates MISSING tables — it never alters an existing one —
 # so a DB created before a column was added needs the column backfilled here.
 # (Single-user local SQLite; no Alembic.) Maps model field -> SQLite DDL type.
-_RECORDING_ADDED_COLUMNS = {"meta": "JSON", "language": "TEXT"}
+_RECORDING_ADDED_COLUMNS = {"meta": "JSON", "language": "TEXT", "stage": "TEXT"}
 
 
 def _migrate_recording_columns(engine: Engine) -> None:

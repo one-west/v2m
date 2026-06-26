@@ -78,6 +78,14 @@ def test_post_without_language_is_null(client):
     assert r.json()["language"] is None
 
 
+def test_status_detail_and_list_include_stage(client):
+    files = {"file": ("m.webm", io.BytesIO(b"a"), "audio/webm")}
+    rec_id = client.post("/api/recordings", files=files).json()["id"]
+    assert "stage" in client.get(f"/api/recordings/{rec_id}/status").json()
+    assert "stage" in client.get(f"/api/recordings/{rec_id}").json()
+    assert "stage" in client.get("/api/recordings").json()[0]
+
+
 def test_patch_updates_meta_and_title(client):
     rec_id = _post_with_meta(client, title="원본").json()["id"]
     r = client.patch(f"/api/recordings/{rec_id}",

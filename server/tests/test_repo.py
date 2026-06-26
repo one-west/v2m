@@ -28,6 +28,15 @@ def test_create_with_language(engine):
         assert repo.get_recording(s, rec.id).language == "en"
 
 
+def test_update_stage_and_set_transcript_clears_it(engine):
+    with Session(engine) as s:
+        rec = repo.create_recording(s, title="X", audio_path="/x")
+        repo.update_stage(s, rec.id, "aligning")
+        assert repo.get_recording(s, rec.id).stage == "aligning"
+        repo.set_transcript(s, rec.id, {"segments": [], "full_text": "", "language": "ko"})
+        assert repo.get_recording(s, rec.id).stage is None
+
+
 def test_list_newest_first(engine):
     with Session(engine) as s:
         a = repo.create_recording(s, title="A", audio_path="/a")
