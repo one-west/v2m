@@ -39,6 +39,22 @@ def update_status(session: Session, rec_id: str, status: RecordingStatus,
     return rec
 
 
+def fail_orphaned_transcriptions(session: Session, *, error: str) -> int:
+    """Mark any recording stuck in `transcribing` as failed — its job thread died
+    with a previous server process (restart/crash), so it would hang forever. Called
+    at startup; the UI then offers retry. Returns how many were recovered."""
+    rows = session.exec(
+        select(Recording).where(Recording.status == RecordingStatus.TRANSCRIBING)
+    ).all()
+    for rec in rows:
+        rec.status = RecordingStatus.FAILED
+        rec.error = error
+        rec.stage = None
+        session.add(rec)
+    session.commit()
+    return len(rows)
+
+
 def update_stage(session: Session, rec_id: str, stage: Optional[str]) -> None:
     """Set the coarse transcription progress stage. Best-effort: never raises."""
     rec = session.get(Recording, rec_id)

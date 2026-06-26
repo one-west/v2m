@@ -27,6 +27,30 @@ def test_whisperx_transcriber_stores_perf_params_without_torch():
     assert d.diarize is True
 
 
+def test_startup_recovers_orphaned_transcriptions(tmp_path):
+    from sqlmodel import Session
+    from app.main import create_app
+    from app.store import db, repo
+    from app.store.models import RecordingStatus
+    from app.transcribe.fake import FakeTranscriber
+
+    e = db.get_engine(tmp_path / "t.db")
+    db.init_db(e)
+    with Session(e) as s:
+        rec = repo.create_recording(s, title="X", audio_path="/x.webm")
+        repo.update_status(s, rec.id, RecordingStatus.TRANSCRIBING)
+        repo.update_stage(s, rec.id, "diarizing")
+        rec_id = rec.id
+
+    create_app(engine=e, transcriber=FakeTranscriber(), shutdown_hook=lambda: None)
+
+    with Session(e) as s:
+        got = repo.get_recording(s, rec_id)
+        assert got.status == RecordingStatus.FAILED
+        assert got.stage is None
+        assert "재시작" in got.error
+
+
 def test_shutdown_endpoint_exists(client):
     resp = client.post("/shutdown")
     assert resp.status_code == 200
