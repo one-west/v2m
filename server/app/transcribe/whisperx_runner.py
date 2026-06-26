@@ -17,7 +17,8 @@ class WhisperXTranscriber:
 
     def __init__(self, model_size: str, hf_token: str, device: str = "cpu",
                  compute_type: str = "int8", ffmpeg_dir: str = "",
-                 batch_size: int = 16, cpu_threads: int = 0, language: str = "ko") -> None:
+                 batch_size: int = 16, cpu_threads: int = 0, language: str = "ko",
+                 suppress_numerals: bool = True, initial_prompt: str = "") -> None:
         self.model_size = model_size
         self.hf_token = hf_token
         self.device = device
@@ -25,6 +26,8 @@ class WhisperXTranscriber:
         self.ffmpeg_dir = ffmpeg_dir
         self.batch_size = batch_size
         self.cpu_threads = cpu_threads
+        self.suppress_numerals = suppress_numerals
+        self.initial_prompt = initial_prompt
         # Force this language instead of letting WhisperX auto-detect (which can
         # misfire on quiet/short Korean audio, e.g. detect 'uk' and yield 0 segments).
         # Empty string -> fall back to auto-detect.
@@ -39,11 +42,15 @@ class WhisperXTranscriber:
             import whisperx  # lazy: keeps torch out of test imports
 
             from app.core.paths import get_models_dir
+            asr_options: dict = {"suppress_numerals": self.suppress_numerals}
+            if self.initial_prompt:
+                asr_options["initial_prompt"] = self.initial_prompt
             with self._lock:
                 if self._model is None:
                     self._model = whisperx.load_model(
                         self.model_size, self.device, compute_type=self.compute_type,
                         threads=self.cpu_threads, download_root=str(get_models_dir()),
+                        asr_options=asr_options,
                     )
         return self._model
 

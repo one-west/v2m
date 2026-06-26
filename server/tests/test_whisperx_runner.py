@@ -113,6 +113,33 @@ def test_models_are_loaded_once_and_cached(monkeypatch, tmp_path):
     assert calls == {"model": 1, "align": 1, "diarize": 1}
 
 
+def test_get_model_passes_asr_options(monkeypatch, tmp_path):
+    monkeypatch.setenv("V2M_DATA_DIR", str(tmp_path))
+    captured: dict = {}
+    fake_wx = types.ModuleType("whisperx")
+    fake_wx.load_model = lambda *a, **k: captured.update(k) or "MODEL"
+    monkeypatch.setitem(sys.modules, "whisperx", fake_wx)
+
+    t = WhisperXTranscriber(model_size="small", hf_token="",
+                            suppress_numerals=True, initial_prompt="V2M 회의")
+    t._get_model()
+    assert captured["asr_options"]["suppress_numerals"] is True
+    assert captured["asr_options"]["initial_prompt"] == "V2M 회의"
+
+
+def test_get_model_omits_empty_initial_prompt(monkeypatch, tmp_path):
+    monkeypatch.setenv("V2M_DATA_DIR", str(tmp_path))
+    captured: dict = {}
+    fake_wx = types.ModuleType("whisperx")
+    fake_wx.load_model = lambda *a, **k: captured.update(k) or "MODEL"
+    monkeypatch.setitem(sys.modules, "whisperx", fake_wx)
+
+    t = WhisperXTranscriber(model_size="small", hf_token="",
+                            suppress_numerals=False, initial_prompt="")
+    t._get_model()
+    assert captured["asr_options"] == {"suppress_numerals": False}
+
+
 def test_align_cache_is_per_language(monkeypatch, tmp_path):
     monkeypatch.setenv("V2M_DATA_DIR", str(tmp_path))
     count = {"align": 0}
