@@ -19,7 +19,7 @@ class WhisperXTranscriber:
                  compute_type: str = "int8", ffmpeg_dir: str = "",
                  batch_size: int = 16, cpu_threads: int = 0, language: str = "ko",
                  suppress_numerals: bool = True, initial_prompt: str = "",
-                 vad_method: str = "silero") -> None:
+                 vad_method: str = "silero", diarize: bool = True) -> None:
         self.model_size = model_size
         self.hf_token = hf_token
         self.device = device
@@ -30,6 +30,7 @@ class WhisperXTranscriber:
         self.suppress_numerals = suppress_numerals
         self.initial_prompt = initial_prompt
         self.vad_method = vad_method
+        self.diarize = diarize
         # Force this language instead of letting WhisperX auto-detect (which can
         # misfire on quiet/short Korean audio, e.g. detect 'uk' and yield 0 segments).
         # Empty string -> fall back to auto-detect.
@@ -129,20 +130,27 @@ class WhisperXTranscriber:
         language = (result.get("language", "ko") if auto else chosen) or "ko"
         t_stt = time.perf_counter()
 
-        stage("aligning")
-        align_model, metadata = self._get_align(language)  # cached per language
-        aligned = whisperx.align(result["segments"], align_model, metadata, audio, self.device)
-        t_align = time.perf_counter()
+        # Fast mode (diarize=False): skip alignment + diarization — together ~90% of
+        # the time on CPU — and use WhisperX's segment-level output directly (single
+        # speaker, segment timestamps). The expensive path stays the default.
+        if self.diarize:
+            stage("aligning")
+            align_model, metadata = self._get_align(language)  # cached per language
+            aligned = whisperx.align(result["segments"], align_model, metadata, audio, self.device)
+            t_align = time.perf_counter()
 
-        stage("diarizing")
-        diarize_model = self._get_diarize()  # cached after the first recording
-        diarize_segments = diarize_model(audio)
-        final = whisperx.assign_word_speakers(diarize_segments, aligned)
-        t_diar = time.perf_counter()
+            stage("diarizing")
+            diarize_model = self._get_diarize()  # cached after the first recording
+            diarize_segments = diarize_model(audio)
+            final_segments = whisperx.assign_word_speakers(diarize_segments, aligned).get("segments", [])
+            t_diar = time.perf_counter()
+        else:
+            t_align = t_diar = t_stt
+            final_segments = result.get("segments", [])
 
         print(
             f"[v2m.transcribe] model={self.model_size} batch={self.batch_size} "
-            f"threads={self.cpu_threads or 'auto'} lang={language} | "
+            f"threads={self.cpu_threads or 'auto'} lang={language} diarize={self.diarize} | "
             f"load+decode={t_load - t0:.1f}s stt={t_stt - t_load:.1f}s "
             f"align={t_align - t_stt:.1f}s diarize={t_diar - t_align:.1f}s "
             f"total={t_diar - t0:.1f}s",
@@ -151,7 +159,7 @@ class WhisperXTranscriber:
 
         segments: list[TranscriptSegment] = []
         texts: list[str] = []
-        for seg in final.get("segments", []):
+        for seg in final_segments:
             text = seg.get("text", "").strip()
             if not text:
                 continue

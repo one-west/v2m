@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # Voice-activity detection backend: "silero" (fast, default) or "pyannote" (slower).
     # Only changes how speech regions are segmented, not transcription text quality.
     vad_method: str = "silero"
+    # Speaker diarization + word alignment. These are ~90% of CPU time on long audio.
+    # Set false ("fast mode") for a single-speaker, segment-timestamp transcript that
+    # finishes ~10x faster — e.g. 1-hour lectures where speaker labels aren't needed.
+    diarize: bool = True
     # Optional dir containing ffmpeg.exe, prepended to PATH at transcribe time.
     # Use when ffmpeg is installed but not on the system PATH (e.g. winget on Windows).
     ffmpeg_dir: str = ""
