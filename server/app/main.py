@@ -47,6 +47,16 @@ def create_app(*, engine=None, transcriber=None, shutdown_hook=None) -> FastAPI:
     if transcriber is None:
         transcriber = _default_transcriber(settings)
 
+    # Recover jobs left "transcribing" by a previous process (restart/crash): their
+    # worker died, so they'd hang forever. Mark failed -> the UI offers retry.
+    from sqlmodel import Session
+    from app.store import repo
+    with Session(engine) as _session:
+        repo.fail_orphaned_transcriptions(
+            _session,
+            error="서버가 재시작되어 이전 전사가 중단되었습니다. 다시 시도해 주세요.",
+        )
+
     app = FastAPI(title="V2M", version=VERSION)
     app.state.engine = engine
     app.state.transcriber = transcriber
