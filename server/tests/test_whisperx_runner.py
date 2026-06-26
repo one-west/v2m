@@ -57,6 +57,43 @@ def test_transcribe_forces_configured_language_and_maps_segments(monkeypatch, tm
     assert seg.start_ms == 0 and seg.end_ms == 1000
 
 
+def test_fast_mode_skips_align_and_diarize(monkeypatch, tmp_path):
+    monkeypatch.setenv("V2M_DATA_DIR", str(tmp_path))
+    calls = {"align": 0, "diarize": 0}
+
+    class _FakeModel:
+        def transcribe(self, audio, batch_size=None, language=None):
+            return {"segments": [{"start": 0.0, "end": 1.0, "text": "안녕"}], "language": "ko"}
+
+    fake_wx = types.ModuleType("whisperx")
+    fake_wx.load_model = lambda *a, **k: _FakeModel()
+    fake_wx.load_audio = lambda p: [0.0]
+    fake_wx.load_align_model = lambda **k: calls.__setitem__("align", calls["align"] + 1) or ("A", "M")
+    fake_wx.align = lambda *a, **k: {"segments": []}
+    fake_wx.assign_word_speakers = lambda d, a: {"segments": []}
+    fake_diarize = types.ModuleType("whisperx.diarize")
+
+    class _Diar:
+        def __init__(self, *a, **k):
+            calls["diarize"] += 1
+
+        def __call__(self, audio):
+            return "D"
+
+    fake_diarize.DiarizationPipeline = _Diar
+    monkeypatch.setitem(sys.modules, "whisperx", fake_wx)
+    monkeypatch.setitem(sys.modules, "whisperx.diarize", fake_diarize)
+
+    t = WhisperXTranscriber(model_size="small", hf_token="", diarize=False)
+    stages: list[str] = []
+    res = t.transcribe(Path("x.webm"), on_stage=stages.append)
+
+    assert calls == {"align": 0, "diarize": 0}  # both skipped in fast mode
+    assert stages == ["loading", "transcribing"]  # no align/diarize stages reported
+    assert [s.text for s in res.segments] == ["안녕"]
+    assert res.segments[0].speaker == "SPEAKER_00"  # single-speaker fallback
+
+
 def test_transcribe_empty_language_autodetects(monkeypatch, tmp_path):
     monkeypatch.setenv("V2M_DATA_DIR", str(tmp_path))
     captured = {}
