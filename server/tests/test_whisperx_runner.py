@@ -127,6 +127,7 @@ def test_get_model_passes_asr_options(monkeypatch, tmp_path):
     t._get_model()
     assert captured["asr_options"]["suppress_numerals"] is True
     assert captured["asr_options"]["initial_prompt"] == "V2M 회의"
+    assert captured["vad_method"] == "silero"  # fast VAD by default
 
 
 def test_get_model_omits_empty_initial_prompt(monkeypatch, tmp_path):

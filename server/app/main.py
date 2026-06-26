@@ -25,6 +25,7 @@ def _default_transcriber(settings):
         language=settings.language,
         suppress_numerals=settings.suppress_numerals,
         initial_prompt=settings.initial_prompt,
+        vad_method=settings.vad_method,
     )
 
 

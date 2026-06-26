@@ -12,6 +12,7 @@ def test_defaults():
     assert s.cpu_threads == 0
     assert s.suppress_numerals is True
     assert s.initial_prompt == ""
+    assert s.vad_method == "silero"
 
 
 def test_env_override(monkeypatch):
@@ -21,6 +22,7 @@ def test_env_override(monkeypatch):
     monkeypatch.setenv("V2M_CPU_THREADS", "6")
     monkeypatch.setenv("V2M_SUPPRESS_NUMERALS", "false")
     monkeypatch.setenv("V2M_INITIAL_PROMPT", "분기 실적 회의")
+    monkeypatch.setenv("V2M_VAD_METHOD", "pyannote")
     s = Settings(_env_file=None)
     assert s.whisper_model == "small"
     assert s.port == 9001
@@ -28,6 +30,7 @@ def test_env_override(monkeypatch):
     assert s.cpu_threads == 6
     assert s.suppress_numerals is False
     assert s.initial_prompt == "분기 실적 회의"
+    assert s.vad_method == "pyannote"
 
 
 def test_get_settings_is_cached():
