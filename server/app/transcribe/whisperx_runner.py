@@ -18,7 +18,8 @@ class WhisperXTranscriber:
     def __init__(self, model_size: str, hf_token: str, device: str = "cpu",
                  compute_type: str = "int8", ffmpeg_dir: str = "",
                  batch_size: int = 16, cpu_threads: int = 0, language: str = "ko",
-                 suppress_numerals: bool = True, initial_prompt: str = "") -> None:
+                 suppress_numerals: bool = True, initial_prompt: str = "",
+                 vad_method: str = "silero") -> None:
         self.model_size = model_size
         self.hf_token = hf_token
         self.device = device
@@ -28,6 +29,7 @@ class WhisperXTranscriber:
         self.cpu_threads = cpu_threads
         self.suppress_numerals = suppress_numerals
         self.initial_prompt = initial_prompt
+        self.vad_method = vad_method
         # Force this language instead of letting WhisperX auto-detect (which can
         # misfire on quiet/short Korean audio, e.g. detect 'uk' and yield 0 segments).
         # Empty string -> fall back to auto-detect.
@@ -55,7 +57,7 @@ class WhisperXTranscriber:
                     self._model = whisperx.load_model(
                         self.model_size, self.device, compute_type=self.compute_type,
                         threads=self.cpu_threads, download_root=str(get_models_dir()),
-                        asr_options=asr_options,
+                        asr_options=asr_options, vad_method=self.vad_method,
                     )
         return self._model
 

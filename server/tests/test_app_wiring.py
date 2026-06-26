@@ -23,6 +23,7 @@ def test_whisperx_transcriber_stores_perf_params_without_torch():
     assert d.language == "ko"
     assert d.suppress_numerals is True
     assert d.initial_prompt == ""
+    assert d.vad_method == "silero"
 
 
 def test_shutdown_endpoint_exists(client):
