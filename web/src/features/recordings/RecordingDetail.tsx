@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { exportUrl, getRecording, patchRecording, retryRecording } from "../../lib/api";
 import type { MeetingMeta, RecordingDetail as Detail, TranscriptSegment } from "../../lib/types";
-import { languageLabel, msToMmss, statusLabel } from "../../lib/format";
+import { languageLabel, msToMmss, stageLabel, statusLabel } from "../../lib/format";
 import { StatusBadge } from "./StatusBadge";
 import { CopyForClaude } from "./CopyForClaude";
 import { MeetingForm } from "../meeting/MeetingForm";
@@ -149,7 +149,10 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void
       )}
 
       {(detail.status === "recorded" || detail.status === "transcribing") && (
-        <p className="empty">{statusLabel(detail.status)}… 잠시만 기다려 주세요.</p>
+        <p className="empty">
+          {statusLabel(detail.status)}
+          {stageLabel(detail.stage) ? ` — ${stageLabel(detail.stage)}` : ""}… 잠시만 기다려 주세요.
+        </p>
       )}
     </div>
   );

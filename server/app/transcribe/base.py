@@ -1,5 +1,7 @@
 from pathlib import Path
-from typing import Optional, Protocol, runtime_checkable
+from typing import Callable, Optional, Protocol, runtime_checkable
+
+StageCallback = Optional[Callable[[str], None]]
 
 from pydantic import BaseModel
 
@@ -22,4 +24,5 @@ class TranscriptResult(BaseModel):
 
 @runtime_checkable
 class Transcriber(Protocol):
-    def transcribe(self, audio_path: Path, language: Optional[str] = None) -> TranscriptResult: ...
+    def transcribe(self, audio_path: Path, language: Optional[str] = None,
+                   on_stage: StageCallback = None) -> TranscriptResult: ...

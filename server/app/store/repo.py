@@ -39,6 +39,16 @@ def update_status(session: Session, rec_id: str, status: RecordingStatus,
     return rec
 
 
+def update_stage(session: Session, rec_id: str, stage: Optional[str]) -> None:
+    """Set the coarse transcription progress stage. Best-effort: never raises."""
+    rec = session.get(Recording, rec_id)
+    if rec is None:
+        return
+    rec.stage = stage
+    session.add(rec)
+    session.commit()
+
+
 def set_transcript(session: Session, rec_id: str, transcript: dict) -> Recording:
     rec = session.get(Recording, rec_id)
     if rec is None:
@@ -46,6 +56,7 @@ def set_transcript(session: Session, rec_id: str, transcript: dict) -> Recording
     rec.transcript = transcript
     rec.status = RecordingStatus.DONE
     rec.error = None
+    rec.stage = None
     session.add(rec)
     session.commit()
     session.refresh(rec)

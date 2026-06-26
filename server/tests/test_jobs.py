@@ -30,7 +30,7 @@ def test_success_path_sets_done_with_transcript(engine):
 
 def test_failure_path_sets_failed_with_error(engine):
     class Boom:
-        def transcribe(self, audio_path, language=None):
+        def transcribe(self, audio_path, language=None, on_stage=None):
             raise RuntimeError("model exploded")
 
     with Session(engine) as s:
@@ -54,3 +54,33 @@ def test_passes_recording_language_to_transcriber(engine):
     run_transcription(rec_id, transcriber=fake, engine=engine)
 
     assert fake.last_language == "en"
+
+
+def test_wires_stage_callback_and_clears_stage_when_done(engine):
+    with Session(engine) as s:
+        rec_id = repo.create_recording(s, title="X", audio_path="/x.webm").id
+
+    fake = FakeTranscriber()
+    run_transcription(rec_id, transcriber=fake, engine=engine)
+
+    assert fake.stages == ["transcribing"]  # on_stage callback was passed through
+    with Session(engine) as s:
+        got = repo.get_recording(s, rec_id)
+        assert got.status == RecordingStatus.DONE
+        assert got.stage is None  # cleared on completion
+
+
+def test_network_error_becomes_friendly_message(engine):
+    class Boom:
+        def transcribe(self, audio_path, language=None, on_stage=None):
+            raise RuntimeError("('Connection broken: IncompleteRead(100 read, 5 more expected)',)")
+
+    with Session(engine) as s:
+        rec_id = repo.create_recording(s, title="X", audio_path="/x.webm").id
+
+    run_transcription(rec_id, transcriber=Boom(), engine=engine)
+
+    with Session(engine) as s:
+        got = repo.get_recording(s, rec_id)
+        assert got.status == RecordingStatus.FAILED
+        assert "네트워크" in got.error and "다시 시도" in got.error

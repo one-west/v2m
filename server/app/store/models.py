@@ -32,3 +32,6 @@ class Recording(SQLModel, table=True):
     # Per-recording transcription language: "ko"/"en"/… to force, "auto" to detect,
     # None for older rows (transcriber falls back to the configured V2M_LANGUAGE).
     language: Optional[str] = Field(default=None)
+    # Coarse transcription progress while status == transcribing:
+    # loading | transcribing | aligning | diarizing (None otherwise).
+    stage: Optional[str] = Field(default=None)

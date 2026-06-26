@@ -33,3 +33,15 @@ export function languageLabel(language: string | null): string | null {
   if (!language) return null;
   return LANGUAGE_LABELS[language] ?? language;
 }
+
+const STAGE_LABELS: Record<string, string> = {
+  loading: "모델 로딩",
+  transcribing: "음성 인식",
+  aligning: "정렬",
+  diarizing: "화자 분리",
+};
+
+export function stageLabel(stage: string | null): string | null {
+  if (!stage) return null;
+  return STAGE_LABELS[stage] ?? stage;
+}

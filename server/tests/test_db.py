@@ -36,6 +36,7 @@ def test_init_db_adds_missing_meta_column(tmp_path):
         assert len(rows) == 1
         assert rows[0].meta is None
         assert rows[0].language is None  # second backfilled column
+        assert rows[0].stage is None  # third backfilled column
         repo.update_recording(s, "old1", meta={"location": "A"})
         assert repo.get_recording(s, "old1").meta == {"location": "A"}
 

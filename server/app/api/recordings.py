@@ -80,7 +80,7 @@ def list_recordings(request: Request):
         return [
             {"id": r.id, "title": r.title, "status": r.status,
              "created_at": r.created_at.isoformat(), "duration_sec": r.duration_sec,
-             "meta": r.meta, "language": r.language}
+             "meta": r.meta, "language": r.language, "stage": r.stage}
             for r in repo.list_recordings(session)
         ]
 
@@ -99,7 +99,7 @@ def get_recording(request: Request, rec_id: str):
         return {"id": rec.id, "title": rec.title, "status": rec.status,
                 "created_at": rec.created_at.isoformat(), "duration_sec": rec.duration_sec,
                 "error": rec.error, "transcript": rec.transcript, "meta": rec.meta,
-                "language": rec.language}
+                "language": rec.language, "stage": rec.stage}
 
 
 @router.patch("/recordings/{rec_id}")
@@ -116,7 +116,7 @@ def patch_recording(request: Request, rec_id: str, body: RecordingPatch):
 def get_status(request: Request, rec_id: str):
     with Session(request.app.state.engine) as session:
         rec = _get_or_404(session, rec_id)
-        return {"id": rec.id, "status": rec.status, "error": rec.error}
+        return {"id": rec.id, "status": rec.status, "error": rec.error, "stage": rec.stage}
 
 
 @router.get("/recordings/{rec_id}/prompt")

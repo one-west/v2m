@@ -81,8 +81,14 @@ class WhisperXTranscriber:
                     )
         return self._diarize
 
-    def transcribe(self, audio_path: Path, language: Optional[str] = None) -> TranscriptResult:
+    def transcribe(self, audio_path: Path, language: Optional[str] = None,
+                   on_stage=None) -> TranscriptResult:
         import os
+
+        def stage(name: str) -> None:
+            if on_stage:
+                on_stage(name)
+
 
         # Windows: HuggingFace cache uses symlinks, which need Developer Mode or admin.
         # Without this, model downloads fail with WinError 1314. Copy files instead.
@@ -95,9 +101,11 @@ class WhisperXTranscriber:
         import whisperx  # lazy: keeps torch out of test imports
 
         t0 = time.perf_counter()
+        stage("loading")
         model = self._get_model()  # cached after the first recording
         audio = whisperx.load_audio(str(audio_path))
         t_load = time.perf_counter()
+        stage("transcribing")
         # batch_size is WhisperX's core speedup: VAD-chunked segments run in parallel.
         # Per-recording `language` overrides the configured default; "auto"/empty/None
         # (with no configured default) => let WhisperX detect.
@@ -108,10 +116,12 @@ class WhisperXTranscriber:
         language = (result.get("language", "ko") if auto else chosen) or "ko"
         t_stt = time.perf_counter()
 
+        stage("aligning")
         align_model, metadata = self._get_align(language)  # cached per language
         aligned = whisperx.align(result["segments"], align_model, metadata, audio, self.device)
         t_align = time.perf_counter()
 
+        stage("diarizing")
         diarize_model = self._get_diarize()  # cached after the first recording
         diarize_segments = diarize_model(audio)
         final = whisperx.assign_word_speakers(diarize_segments, aligned)
