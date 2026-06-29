@@ -146,8 +146,9 @@ class WhisperXTranscriber:
             for i, (a, b) in enumerate(windows):
                 stage(f"transcribing:{i + 1}/{n}")
                 r = model.transcribe(audio[a:b], batch_size=self.batch_size, language=forced)
-                if detected is None:
-                    detected = r.get("language")
+                # Keep the first non-empty detection: a silent opening chunk can
+                # return no language, so fall through to a later chunk's result.
+                detected = detected or r.get("language")
                 offset = a / _SAMPLE_RATE  # seconds; mapped to ms in the shared loop below
                 for seg in r.get("segments", []):
                     seg = dict(seg)
