@@ -12,10 +12,11 @@ def test_whisperx_transcriber_stores_perf_params_without_torch():
     from app.transcribe.whisperx_runner import WhisperXTranscriber
 
     t = WhisperXTranscriber(model_size="small", hf_token="", batch_size=8, cpu_threads=4,
-                            language="en")
+                            language="en", chunk_minutes=30)
     assert t.batch_size == 8
     assert t.cpu_threads == 4
     assert t.language == "en"
+    assert t.chunk_minutes == 30
     # Defaults: batched + auto threads + Korean + numeral suppression on, no prompt.
     d = WhisperXTranscriber(model_size="small", hf_token="")
     assert d.batch_size == 16
@@ -25,6 +26,7 @@ def test_whisperx_transcriber_stores_perf_params_without_torch():
     assert d.initial_prompt == ""
     assert d.vad_method == "silero"
     assert d.diarize is True
+    assert d.chunk_minutes == 60
 
 
 def test_startup_recovers_orphaned_transcriptions(tmp_path):

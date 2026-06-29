@@ -14,6 +14,7 @@ def test_defaults():
     assert s.initial_prompt == ""
     assert s.vad_method == "silero"
     assert s.diarize is True
+    assert s.chunk_minutes == 60
 
 
 def test_env_override(monkeypatch):
@@ -25,6 +26,7 @@ def test_env_override(monkeypatch):
     monkeypatch.setenv("V2M_INITIAL_PROMPT", "분기 실적 회의")
     monkeypatch.setenv("V2M_VAD_METHOD", "pyannote")
     monkeypatch.setenv("V2M_DIARIZE", "false")
+    monkeypatch.setenv("V2M_CHUNK_MINUTES", "30")
     s = Settings(_env_file=None)
     assert s.whisper_model == "small"
     assert s.port == 9001
@@ -34,6 +36,7 @@ def test_env_override(monkeypatch):
     assert s.initial_prompt == "분기 실적 회의"
     assert s.vad_method == "pyannote"
     assert s.diarize is False
+    assert s.chunk_minutes == 30
 
 
 def test_get_settings_is_cached():

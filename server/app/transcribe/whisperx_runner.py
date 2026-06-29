@@ -19,7 +19,8 @@ class WhisperXTranscriber:
                  compute_type: str = "int8", ffmpeg_dir: str = "",
                  batch_size: int = 16, cpu_threads: int = 0, language: str = "ko",
                  suppress_numerals: bool = True, initial_prompt: str = "",
-                 vad_method: str = "silero", diarize: bool = True) -> None:
+                 vad_method: str = "silero", diarize: bool = True,
+                 chunk_minutes: int = 60) -> None:
         self.model_size = model_size
         self.hf_token = hf_token
         self.device = device
@@ -31,6 +32,7 @@ class WhisperXTranscriber:
         self.initial_prompt = initial_prompt
         self.vad_method = vad_method
         self.diarize = diarize
+        self.chunk_minutes = chunk_minutes
         # Force this language instead of letting WhisperX auto-detect (which can
         # misfire on quiet/short Korean audio, e.g. detect 'uk' and yield 0 segments).
         # Empty string -> fall back to auto-detect.
