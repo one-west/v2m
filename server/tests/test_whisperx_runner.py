@@ -235,3 +235,40 @@ def test_align_cache_is_per_language(monkeypatch, tmp_path):
     t._get_align("en")  # different language -> separate load
     t._get_align("ko")  # cached
     assert count["align"] == 2
+
+
+def test_fast_mode_chunks_long_audio_and_offsets_timestamps(monkeypatch, tmp_path):
+    monkeypatch.setenv("V2M_DATA_DIR", str(tmp_path))
+    import numpy as np
+    SR = 16000
+    calls = []
+
+    class _FakeModel:
+        def transcribe(self, audio, batch_size=None, language=None):
+            calls.append(len(audio))
+            # one segment per chunk, timed locally at 0..1s within the chunk
+            return {"segments": [{"start": 0.0, "end": 1.0, "text": f"seg{len(calls)}"}],
+                    "language": "ko"}
+
+    fake_wx = types.ModuleType("whisperx")
+    fake_wx.load_model = lambda *a, **k: _FakeModel()
+    # 130s of audio with quiet dips at the 60s and 120s boundaries -> 3 chunks
+    audio = np.ones(int(SR * 130), dtype=np.float32)
+    audio[SR * 60 - 2000:SR * 60 + 2000] = 0.0
+    audio[SR * 120 - 2000:SR * 120 + 2000] = 0.0
+    fake_wx.load_audio = lambda p: audio
+    monkeypatch.setitem(sys.modules, "whisperx", fake_wx)
+
+    # chunk every 1 minute, fast mode
+    t = WhisperXTranscriber(model_size="small", hf_token="", diarize=False, chunk_minutes=1)
+    stages: list[str] = []
+    res = t.transcribe(Path("long.webm"), on_stage=stages.append)
+
+    assert len(calls) == 3                       # split into 3 chunks
+    assert len(res.segments) == 3                # one segment per chunk, concatenated
+    starts = [s.start_ms for s in res.segments]
+    assert starts[0] == 0                        # first chunk not offset
+    assert starts == sorted(starts) and len(set(starts)) == 3   # strictly increasing offsets
+    assert starts[1] > 50_000                    # ~60s offset applied to chunk 2
+    assert "transcribing:1/3" in stages and "transcribing:3/3" in stages
+    assert "loading" in stages

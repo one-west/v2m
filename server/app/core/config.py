@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # Set false ("fast mode") for a single-speaker, segment-timestamp transcript that
     # finishes ~10x faster — e.g. 1-hour lectures where speaker labels aren't needed.
     diarize: bool = True
+    # Long-recording chunking (fast mode only): split audio longer than this many
+    # minutes into sequential chunks (silence-aware cuts), to bound peak transient
+    # memory and report per-chunk progress. 0 disables. Ignored when diarize=true.
+    chunk_minutes: int = 60
     # Optional dir containing ffmpeg.exe, prepended to PATH at transcribe time.
     # Use when ffmpeg is installed but not on the system PATH (e.g. winget on Windows).
     ffmpeg_dir: str = ""

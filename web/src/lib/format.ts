@@ -43,5 +43,8 @@ const STAGE_LABELS: Record<string, string> = {
 
 export function stageLabel(stage: string | null): string | null {
   if (!stage) return null;
+  // Chunked transcription reports progress as "transcribing:k/n".
+  const m = /^transcribing:(\d+)\/(\d+)$/.exec(stage);
+  if (m) return `${STAGE_LABELS.transcribing} (${m[1]}/${m[2]})`;
   return STAGE_LABELS[stage] ?? stage;
 }

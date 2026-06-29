@@ -27,6 +27,7 @@ def _default_transcriber(settings):
         initial_prompt=settings.initial_prompt,
         vad_method=settings.vad_method,
         diarize=settings.diarize,
+        chunk_minutes=settings.chunk_minutes,
     )
 
 

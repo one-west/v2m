@@ -34,6 +34,8 @@ describe("format", () => {
     expect(stageLabel("transcribing")).toBe("음성 인식");
     expect(stageLabel("aligning")).toBe("정렬");
     expect(stageLabel("diarizing")).toBe("화자 분리");
+    expect(stageLabel("transcribing:2/5")).toBe("음성 인식 (2/5)");
+    expect(stageLabel("transcribing:1/1")).toBe("음성 인식 (1/1)");
     expect(stageLabel(null)).toBeNull();
   });
 });
