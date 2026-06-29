@@ -5,6 +5,8 @@ from typing import Optional
 
 from app.transcribe.base import TranscriptResult, TranscriptSegment
 
+_SAMPLE_RATE = 16000  # whisperx.load_audio resamples to 16 kHz
+
 
 class WhisperXTranscriber:
     """Real local STT + diarization. whisperx/torch imported lazily.
@@ -121,38 +123,67 @@ class WhisperXTranscriber:
         model = self._get_model()  # cached after the first recording
         audio = whisperx.load_audio(str(audio_path))
         t_load = time.perf_counter()
-        stage("transcribing")
-        # batch_size is WhisperX's core speedup: VAD-chunked segments run in parallel.
+
         # Per-recording `language` overrides the configured default; "auto"/empty/None
         # (with no configured default) => let WhisperX detect.
         chosen = language if language is not None else self.language
         auto = chosen in (None, "", "auto")
         forced = None if auto else chosen
-        result = model.transcribe(audio, batch_size=self.batch_size, language=forced)
-        language = (result.get("language", "ko") if auto else chosen) or "ko"
-        t_stt = time.perf_counter()
 
-        # Fast mode (diarize=False): skip alignment + diarization — together ~90% of
-        # the time on CPU — and use WhisperX's segment-level output directly (single
-        # speaker, segment timestamps). The expensive path stays the default.
-        if self.diarize:
-            stage("aligning")
-            align_model, metadata = self._get_align(language)  # cached per language
-            aligned = whisperx.align(result["segments"], align_model, metadata, audio, self.device)
-            t_align = time.perf_counter()
+        chunk_sec = self.chunk_minutes * 60
+        duration = len(audio) / _SAMPLE_RATE
+        # Chunking only helps (and is only correct) in fast mode: every segment is
+        # SPEAKER_00 so concatenation is trivial. Diarize mode keeps the single pass.
+        chunked = (not self.diarize) and chunk_sec > 0 and duration > chunk_sec
 
-            stage("diarizing")
-            diarize_model = self._get_diarize()  # cached after the first recording
-            diarize_segments = diarize_model(audio)
-            final_segments = whisperx.assign_word_speakers(diarize_segments, aligned).get("segments", [])
-            t_diar = time.perf_counter()
+        if chunked:
+            from app.transcribe.chunking import plan_chunk_windows
+
+            windows = plan_chunk_windows(audio, _SAMPLE_RATE, chunk_sec)
+            n = len(windows)
+            final_segments: list = []
+            detected = None
+            for i, (a, b) in enumerate(windows):
+                stage(f"transcribing:{i + 1}/{n}")
+                r = model.transcribe(audio[a:b], batch_size=self.batch_size, language=forced)
+                if detected is None:
+                    detected = r.get("language")
+                offset = a / _SAMPLE_RATE  # seconds; mapped to ms in the shared loop below
+                for seg in r.get("segments", []):
+                    seg = dict(seg)
+                    seg["start"] = seg.get("start", 0) + offset
+                    seg["end"] = seg.get("end", 0) + offset
+                    final_segments.append(seg)
+            language = (detected if auto else chosen) or "ko"
+            t_stt = t_align = t_diar = time.perf_counter()
         else:
-            t_align = t_diar = t_stt
-            final_segments = result.get("segments", [])
+            stage("transcribing")
+            # batch_size is WhisperX's core speedup: VAD-chunked segments run in parallel.
+            result = model.transcribe(audio, batch_size=self.batch_size, language=forced)
+            language = (result.get("language", "ko") if auto else chosen) or "ko"
+            t_stt = time.perf_counter()
+
+            # Fast mode (diarize=False): skip alignment + diarization (~90% of CPU
+            # time) and use WhisperX's segment-level output directly.
+            if self.diarize:
+                stage("aligning")
+                align_model, metadata = self._get_align(language)  # cached per language
+                aligned = whisperx.align(result["segments"], align_model, metadata, audio, self.device)
+                t_align = time.perf_counter()
+
+                stage("diarizing")
+                diarize_model = self._get_diarize()  # cached after the first recording
+                diarize_segments = diarize_model(audio)
+                final_segments = whisperx.assign_word_speakers(diarize_segments, aligned).get("segments", [])
+                t_diar = time.perf_counter()
+            else:
+                t_align = t_diar = t_stt
+                final_segments = result.get("segments", [])
 
         print(
             f"[v2m.transcribe] model={self.model_size} batch={self.batch_size} "
-            f"threads={self.cpu_threads or 'auto'} lang={language} diarize={self.diarize} | "
+            f"threads={self.cpu_threads or 'auto'} lang={language} diarize={self.diarize} "
+            f"chunked={chunked} | "
             f"load+decode={t_load - t0:.1f}s stt={t_stt - t_load:.1f}s "
             f"align={t_align - t_stt:.1f}s diarize={t_diar - t_align:.1f}s "
             f"total={t_diar - t0:.1f}s",
