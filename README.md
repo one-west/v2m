@@ -60,12 +60,12 @@ v2m/
 
 ```bash
 npm install        # 루트: concurrently 설치 (최초 1회)
-npm run dev        # 백엔드(:8000) + 프론트(:5173) 동시 실행
+npm run dev        # 백엔드(:8000) + 프론트(:5174) 동시 실행
 ```
 
 - 백엔드는 **`server/.venv-ml`**(실제 전사용 Python 3.12 venv)로 실행됩니다 — 아래 백엔드 셋업에서
   `.venv-ml`을 먼저 만들어 두세요. (비-Windows는 `package.json`의 `dev:server` 경로를 `.venv-ml/bin/python`으로 조정)
-- 프론트는 `/api`를 백엔드 `:8000`으로 프록시합니다. 브라우저에서 `http://localhost:5173` 접속.
+- 프론트는 `/api`를 백엔드 `:8000`으로 프록시합니다. 브라우저에서 `http://localhost:5174` 접속.
 
 각각 따로 실행하려면 아래를 참고하세요.
 

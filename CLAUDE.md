@@ -12,7 +12,7 @@ Design rationale and all product decisions live in [docs/superpowers/specs/v2m-v
 
 ## Commands
 
-**One-command dev (recommended):** from the repo root, `npm install` once, then `npm run dev` runs backend (`:8000`) + frontend (`:5173`) together via `concurrently`. The launcher runs the backend with `server/.venv-ml` (the Python 3.12 real-transcription venv) — create that venv first (see README).
+**One-command dev (recommended):** from the repo root, `npm install` once, then `npm run dev` runs backend (`:8000`) + frontend (`:5174`) together via `concurrently`. The launcher runs the backend with `server/.venv-ml` (the Python 3.12 real-transcription venv) — create that venv first (see README).
 
 ### Backend (`server/`, with its venv)
 
@@ -35,7 +35,7 @@ python run.py                                                  # serve on http:/
 npm test                              # full Vitest suite (27 tests)
 npm test -- src/features/recordings   # subset (path filter; Vitest does NOT type-check)
 npm run build                         # tsc --noEmit (type gate) + vite build → web/dist (backend serves at /)
-npm run dev                           # Vite dev server :5173, proxies /api + /health to :8000
+npm run dev                           # Vite dev server :5174, proxies /api + /health to :8000
 ```
 
 Tests run **without** `torch`/`whisperx` installed — see the invariant below. Real transcription has extra requirements (verified working end-to-end on Windows, 2026-06):
