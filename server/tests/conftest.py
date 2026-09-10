@@ -25,6 +25,9 @@ def client(engine, transcriber, tmp_path, monkeypatch):
     # Force-empty (not delete): an env var overrides any developer-local server/.env file,
     # so tests stay hermetic regardless of whether a real HF token is configured on disk.
     monkeypatch.setenv("V2M_HF_TOKEN", "")
+    # Same reason: a developer .env running in fast mode would otherwise change
+    # what /health reports. Pin the code default; tests that care set it themselves.
+    monkeypatch.setenv("V2M_DIARIZE", "true")
     get_settings.cache_clear()
     app = create_app(engine=engine, transcriber=transcriber, shutdown_hook=lambda: None)
     return TestClient(app)

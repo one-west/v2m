@@ -58,4 +58,25 @@ describe("useRecorder", () => {
     expect(onChunk).toHaveBeenCalledTimes(1);
     expect(onChunk.mock.calls[0][0].size).toBeGreaterThan(0);
   });
+
+  it("releases the microphone when MediaRecorder cannot be constructed", async () => {
+    const stop = vi.fn();
+    vi.stubGlobal("navigator", {
+      mediaDevices: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop }] }) },
+    });
+    vi.stubGlobal("MediaRecorder", class {
+      static isTypeSupported() { return true; }
+      constructor() { throw new Error("unsupported mimeType"); }
+    });
+
+    const { result } = renderHook(() => useRecorder());
+    await act(async () => {
+      await expect(result.current.start()).rejects.toThrow();
+    });
+
+    // getUserMedia already granted the mic; without this the tab keeps recording
+    // indicator on with no way to stop it.
+    expect(stop).toHaveBeenCalled();
+    expect(result.current.isRecording).toBe(false);
+  });
 });

@@ -19,11 +19,19 @@ export function App() {
   const [draftLanguage, setDraftLanguage] = useState("ko");
   const [pending, setPending] = useState<PendingSession | null>(null);
   const [recovering, setRecovering] = useState(false);
+  const [recoverError, setRecoverError] = useState<string | null>(null);
+  const [opError, setOpError] = useState<string | null>(null);
 
   // The recorder lives in App (not RecorderPanel) so it keeps running while the
   // user navigates between views inside the tab — MediaRecorder isn't unmounted.
   const { isRecording, elapsedMs, start, stop } = useRecorder({
-    onChunk: (blob) => { appendChunk(blob).catch(() => {}); },
+    onChunk: (blob) => {
+      // A dead buffer (quota, private mode) means the reload-recovery safety net is
+      // gone. Say so instead of letting the user believe they are still covered.
+      appendChunk(blob).catch(() =>
+        setOpError("복구 백업이 중단되었습니다. 녹음을 정지하기 전에 페이지를 새로고침하지 마세요."),
+      );
+    },
   });
   const [busy, setBusy] = useState(false);
   const [recError, setRecError] = useState<string | null>(null);
@@ -65,15 +73,19 @@ export function App() {
   async function handleRecover() {
     if (!pending) return;
     setRecovering(true);
+    setRecoverError(null);
     try {
       await uploadRecording(pending.audio, {
         title: pending.meta.title,
         meta: pending.meta.meta,
         language: pending.meta.language,
       });
+      // Only drop the buffered audio once the server has it — it is the only copy.
       await clearSession().catch(() => {});
       setPending(null);
       refresh();
+    } catch {
+      setRecoverError("복구에 실패했습니다. 백엔드 서버를 확인한 뒤 다시 시도해 주세요.");
     } finally {
       setRecovering(false);
     }
@@ -85,7 +97,13 @@ export function App() {
   }
 
   async function handleDelete(id: string) {
-    await deleteRecording(id);
+    setOpError(null);
+    try {
+      await deleteRecording(id);
+    } catch {
+      setOpError("삭제에 실패했습니다. 백엔드 서버를 확인해 주세요.");
+      return;
+    }
     if (selectedId === id) setSelectedId(null);
     refresh();
   }
@@ -105,6 +123,7 @@ export function App() {
         )}
       </header>
       <main className="container">
+        {opError && <p role="alert" className="warn-text">{opError}</p>}
         {pending && (
           <div className="card" role="alert">
             <h2>중단된 녹음 발견</h2>
@@ -120,6 +139,7 @@ export function App() {
                 삭제
               </button>
             </div>
+            {recoverError && <p className="warn-text">{recoverError}</p>}
           </div>
         )}
         {selectedId ? (

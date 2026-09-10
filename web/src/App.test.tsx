@@ -18,7 +18,10 @@ vi.mock("./lib/api", () => ({
   retryRecording: vi.fn().mockResolvedValue(undefined),
 }));
 const recorderState = { isRecording: false, elapsedMs: 0, start: vi.fn(), stop: vi.fn() };
-vi.mock("./hooks/useRecorder", () => ({ useRecorder: () => recorderState }));
+// Captures the options App passes in, so a test can fire onChunk like MediaRecorder does.
+type RecorderOpts = { onChunk?: (b: Blob) => void };
+const useRecorderMock = vi.fn((_opts?: RecorderOpts) => recorderState);
+vi.mock("./hooks/useRecorder", () => ({ useRecorder: (opts?: RecorderOpts) => useRecorderMock(opts) }));
 vi.mock("./features/recordings/CopyForClaude", () => ({ CopyForClaude: () => <div>copy</div> }));
 vi.mock("./lib/recordingStore", () => ({
   getPendingSession: vi.fn().mockResolvedValue(null),
@@ -26,13 +29,18 @@ vi.mock("./lib/recordingStore", () => ({
   beginSession: vi.fn().mockResolvedValue(undefined),
   appendChunk: vi.fn().mockResolvedValue(undefined),
 }));
-import { uploadRecording } from "./lib/api";
-import { getPendingSession } from "./lib/recordingStore";
+import { deleteRecording, uploadRecording } from "./lib/api";
+import { appendChunk, getPendingSession } from "./lib/recordingStore";
 
 beforeEach(() => {
   vi.clearAllMocks();
   recorderState.isRecording = false;
+  // clearAllMocks keeps implementations, so restore the happy path for every mock a
+  // failure-case test overrides — otherwise the rejection leaks into later tests.
   (getPendingSession as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+  (uploadRecording as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "a" });
+  (deleteRecording as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+  (appendChunk as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 });
 
 describe("App", () => {
@@ -75,5 +83,43 @@ describe("App", () => {
     const [, opts] = (uploadRecording as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(opts).toEqual({ title: "끊긴회의", meta: { location: "A" }, language: "ko" });
     await waitFor(() => expect(screen.queryByText("중단된 녹음 발견")).not.toBeInTheDocument());
+  });
+
+  it("keeps the recovery offer and explains the failure when recovery upload fails", async () => {
+    (getPendingSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+      meta: { title: "끊긴회의", meta: {}, language: "ko" },
+      audio: new Blob(["x"]),
+    });
+    (uploadRecording as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("HTTP 500"));
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("중단된 녹음 발견")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "복구" }));
+
+    // The buffered audio is the only copy — the offer must survive a failed upload
+    // so the user can retry instead of silently losing the recording.
+    await waitFor(() => expect(screen.getByText(/복구에 실패/)).toBeInTheDocument());
+    expect(screen.getByText("중단된 녹음 발견")).toBeInTheDocument();
+  });
+
+  it("reports a failed delete instead of leaving the row silently in place", async () => {
+    (deleteRecording as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("HTTP 500"));
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "주간회의" })).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "주간회의 삭제" }));
+    await waitFor(() => expect(screen.getByText(/삭제에 실패/)).toBeInTheDocument());
+  });
+
+  it("warns when the durable recording buffer stops accepting chunks", async () => {
+    (appendChunk as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("QuotaExceededError"));
+    recorderState.isRecording = true;
+    render(<App />);
+
+    // App wires its own onChunk into useRecorder; invoke it the way MediaRecorder would.
+    const calls = useRecorderMock.mock.calls;
+    calls[calls.length - 1][0]?.onChunk?.(new Blob(["chunk"]));
+
+    await waitFor(() => expect(screen.getByText(/복구 백업이 중단/)).toBeInTheDocument());
   });
 });

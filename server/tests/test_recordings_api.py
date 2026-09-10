@@ -100,3 +100,26 @@ def test_patch_updates_meta_and_title(client):
 def test_patch_unknown_id_404(client):
     r = client.patch("/api/recordings/missing", json={"title": "x"})
     assert r.status_code == 404
+
+
+def test_malformed_meta_returns_400(client):
+    files = {"file": ("m.webm", io.BytesIO(b"a"), "audio/webm")}
+    resp = client.post("/api/recordings", files=files, data={"meta": "{not json"})
+    assert resp.status_code == 400
+
+
+def test_patch_response_carries_language_and_stage(client):
+    files = {"file": ("m.webm", io.BytesIO(b"a"), "audio/webm")}
+    rec_id = client.post("/api/recordings", files=files, data={"language": "en"}).json()["id"]
+    body = client.patch(f"/api/recordings/{rec_id}", json={"title": "새 제목"}).json()
+    assert body["language"] == "en"
+    assert "stage" in body
+
+
+def test_uploaded_audio_bytes_are_stored_verbatim(client):
+    payload = bytes(range(256)) * 400  # ~100 KB, spans multiple read chunks
+    files = {"file": ("m.webm", io.BytesIO(payload), "audio/webm")}
+    rec_id = client.post("/api/recordings", files=files).json()["id"]
+    from pathlib import Path
+    from app.core.paths import get_audio_dir
+    assert Path(get_audio_dir() / f"{rec_id}.webm").read_bytes() == payload

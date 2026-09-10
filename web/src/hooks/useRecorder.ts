@@ -22,8 +22,16 @@ export function useRecorder(opts: { onChunk?: (blob: Blob) => void } = {}): UseR
 
   const start = useCallback(async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mime = MediaRecorder.isTypeSupported(MIME) ? MIME : "";
-    const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    let rec: MediaRecorder;
+    try {
+      const mime = MediaRecorder.isTypeSupported(MIME) ? MIME : "";
+      rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    } catch (e) {
+      // The mic is already live at this point; leaving it running would strand the
+      // browser's recording indicator with no UI able to turn it off.
+      stream.getTracks().forEach((t) => t.stop());
+      throw e;
+    }
     chunksRef.current = [];
     rec.ondataavailable = (e) => {
       if (e.data.size > 0) {

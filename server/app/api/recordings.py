@@ -1,4 +1,5 @@
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -21,6 +22,15 @@ class RecordingPatch(BaseModel):
     meta: dict | None = None
 
 
+def _detail(rec) -> dict:
+    """The full single-recording shape. One definition so every endpoint that
+    returns a recording stays in sync (GET and PATCH used to drift)."""
+    return {"id": rec.id, "title": rec.title, "status": rec.status,
+            "created_at": rec.created_at.isoformat(), "duration_sec": rec.duration_sec,
+            "error": rec.error, "transcript": rec.transcript, "meta": rec.meta,
+            "language": rec.language, "stage": rec.stage}
+
+
 def _schedule(request: Request, background: BackgroundTasks, rec_id: str) -> None:
     background.add_task(
         run_transcription,
@@ -30,8 +40,10 @@ def _schedule(request: Request, background: BackgroundTasks, rec_id: str) -> Non
     )
 
 
+# Sync (not async) on purpose: FastAPI runs it in a threadpool, so the blocking
+# file copy below never stalls the event loop.
 @router.post("/recordings", status_code=201)
-async def create_recording(
+def create_recording(
     request: Request,
     background: BackgroundTasks,
     file: UploadFile = File(...),
@@ -39,7 +51,10 @@ async def create_recording(
     meta: str = Form(default=""),
     language: str = Form(default=""),
 ):
-    parsed_meta = json.loads(meta) if meta else None
+    try:
+        parsed_meta = json.loads(meta) if meta else None
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="meta must be valid JSON")
     engine = request.app.state.engine
     with Session(engine) as session:
         rec = repo.create_recording(
@@ -54,7 +69,10 @@ async def create_recording(
 
     dest = get_audio_dir() / f"{rec_id}.webm"
     try:
-        dest.write_bytes(await file.read())
+        # Stream the upload to disk. A multi-hour meeting is hundreds of MB, and
+        # reading it whole would spike RSS by that much for the length of the request.
+        with dest.open("wb") as out:
+            shutil.copyfileobj(file.file, out)
     except Exception:
         with Session(engine) as session:
             repo.delete_recording(session, rec_id)
@@ -95,21 +113,14 @@ def _get_or_404(session: Session, rec_id: str):
 @router.get("/recordings/{rec_id}")
 def get_recording(request: Request, rec_id: str):
     with Session(request.app.state.engine) as session:
-        rec = _get_or_404(session, rec_id)
-        return {"id": rec.id, "title": rec.title, "status": rec.status,
-                "created_at": rec.created_at.isoformat(), "duration_sec": rec.duration_sec,
-                "error": rec.error, "transcript": rec.transcript, "meta": rec.meta,
-                "language": rec.language, "stage": rec.stage}
+        return _detail(_get_or_404(session, rec_id))
 
 
 @router.patch("/recordings/{rec_id}")
 def patch_recording(request: Request, rec_id: str, body: RecordingPatch):
     with Session(request.app.state.engine) as session:
         _get_or_404(session, rec_id)
-        rec = repo.update_recording(session, rec_id, title=body.title, meta=body.meta)
-        return {"id": rec.id, "title": rec.title, "status": rec.status,
-                "created_at": rec.created_at.isoformat(), "duration_sec": rec.duration_sec,
-                "error": rec.error, "transcript": rec.transcript, "meta": rec.meta}
+        return _detail(repo.update_recording(session, rec_id, title=body.title, meta=body.meta))
 
 
 @router.get("/recordings/{rec_id}/status")
