@@ -120,3 +120,7 @@ input:focus, textarea:focus, select:focus {
   padding: 10px 16px; border-radius: 999px; font-size: 14px; }
 .warn-text { color: var(--warn); font-size: 13px; }
 .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+/* Native <audio>: the browser paints its own control bar, so only sizing and a
+   matching surface are ours. color-scheme keeps Chrome's controls on the dark theme. */
+.player { width: 100%; height: 40px; color-scheme: dark; border-radius: var(--r-field); }

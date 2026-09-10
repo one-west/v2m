@@ -8,6 +8,7 @@ vi.mock("../../lib/api", () => ({
   patchRecording: vi.fn().mockResolvedValue({}),
   retryRecording: vi.fn().mockResolvedValue(undefined),
   exportUrl: (id: string, f: string) => `/api/recordings/${id}/export?format=${f}`,
+  audioUrl: (id: string, f: string) => `/api/recordings/${id}/audio?format=${f}`,
 }));
 vi.mock("./CopyForClaude", () => ({ CopyForClaude: () => <div>copy-stub</div> }));
 import { getRecording, patchRecording, retryRecording } from "../../lib/api";
@@ -37,6 +38,28 @@ describe("groupSegments", () => {
 });
 
 describe("RecordingDetail", () => {
+  it("offers playback of the original audio and an mp3 download", async () => {
+    (getRecording as ReturnType<typeof vi.fn>).mockResolvedValue(doneDetail);
+    const { container } = render(<RecordingDetail id="a" onBack={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText("안녕하세요")).toBeInTheDocument());
+
+    const player = container.querySelector("audio");
+    expect(player).toHaveAttribute("src", "/api/recordings/a/audio?format=webm");
+    expect(player).toHaveAttribute("controls");
+    expect(screen.getByRole("link", { name: /MP3/ }))
+      .toHaveAttribute("href", "/api/recordings/a/audio?format=mp3");
+  });
+
+  it("still offers playback when transcription failed", async () => {
+    // A failed transcription is exactly when the user needs to hear the original.
+    (getRecording as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...doneDetail, status: "failed", error: "모델 로딩 실패", transcript: null,
+    });
+    const { container } = render(<RecordingDetail id="a" onBack={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText(/전사 실패/)).toBeInTheDocument());
+    expect(container.querySelector("audio")).toHaveAttribute("src", "/api/recordings/a/audio?format=webm");
+  });
+
   it("renders transcript + export link when done and saves title+meta", async () => {
     (getRecording as ReturnType<typeof vi.fn>).mockResolvedValue(doneDetail);
     render(<RecordingDetail id="a" onBack={vi.fn()} />);

@@ -55,3 +55,8 @@ export async function getPrompt(id: string): Promise<PromptBundle> {
 export function exportUrl(id: string, format: "md" | "txt"): string {
   return `/api/recordings/${id}/export?format=${format}`;
 }
+
+/** Playback/download URL. `webm` is the stored original; `mp3` is transcoded on first use. */
+export function audioUrl(id: string, format: "webm" | "mp3"): string {
+  return `/api/recordings/${id}/audio?format=${format}`;
+}

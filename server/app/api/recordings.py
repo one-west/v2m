@@ -4,10 +4,12 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.jobs.queue import run_transcription
+from app.core.ffmpeg import find_ffmpeg, transcode_to_mp3
 from app.core.paths import get_audio_dir
 from app.export.markdown import content_disposition, to_markdown, to_txt
 from app.prompt.builder import build_prompt
@@ -155,6 +157,43 @@ def export(request: Request, rec_id: str, format: str = "md"):
     return Response(content=content, media_type=media, headers=headers)
 
 
+# Sync on purpose: an MP3 conversion can take a minute on a long recording, and a
+# sync endpoint runs in FastAPI's threadpool instead of blocking the event loop.
+@router.get("/recordings/{rec_id}/audio")
+def get_audio(request: Request, rec_id: str, format: str = "webm"):
+    if format not in ("webm", "mp3"):
+        raise HTTPException(status_code=400, detail="format must be webm or mp3")
+    with Session(request.app.state.engine) as session:
+        rec = _get_or_404(session, rec_id)
+        source = Path(rec.audio_path) if rec.audio_path else None
+        title = rec.title
+    if source is None or not source.is_file():
+        raise HTTPException(status_code=404, detail="audio file not found")
+
+    if format == "webm":
+        return FileResponse(source, media_type="audio/webm",
+                            headers={"Content-Disposition": content_disposition(title, "webm", rec_id)})
+
+    # Convert once and keep the result next to the original: re-encoding a
+    # multi-hour meeting on every download would cost a minute each time.
+    mp3 = source.with_suffix(".mp3")
+    if not mp3.is_file():
+        exe = find_ffmpeg(request.app.state.settings.ffmpeg_dir)
+        if exe is None:
+            raise HTTPException(
+                status_code=503,
+                detail="mp3 변환에는 ffmpeg가 필요합니다. ffmpeg를 설치하거나 V2M_FFMPEG_DIR를 설정해 주세요.",
+            )
+        try:
+            transcode_to_mp3(source, mp3, exe)
+        except Exception as exc:  # noqa: BLE001 - surface any encoder failure as 500
+            # Never leave a truncated file behind: it would be served as a valid cache.
+            mp3.unlink(missing_ok=True)
+            raise HTTPException(status_code=500, detail=f"mp3 변환에 실패했습니다: {exc}")
+    return FileResponse(mp3, media_type="audio/mpeg",
+                        headers={"Content-Disposition": content_disposition(title, "mp3", rec_id)})
+
+
 @router.post("/recordings/{rec_id}/retry")
 def retry(request: Request, background: BackgroundTasks, rec_id: str):
     with Session(request.app.state.engine) as session:
@@ -170,6 +209,7 @@ def delete_recording(request: Request, rec_id: str):
         rec = _get_or_404(session, rec_id)
         audio = Path(rec.audio_path) if rec.audio_path else None
         repo.delete_recording(session, rec_id)
-    if audio and audio.exists():
-        audio.unlink()
+    if audio:
+        audio.unlink(missing_ok=True)
+        audio.with_suffix(".mp3").unlink(missing_ok=True)  # the download cache
     return Response(status_code=204)

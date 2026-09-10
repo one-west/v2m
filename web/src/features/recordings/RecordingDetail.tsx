@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { exportUrl, getRecording, patchRecording, retryRecording } from "../../lib/api";
+import { audioUrl, exportUrl, getRecording, patchRecording, retryRecording } from "../../lib/api";
 import type { MeetingMeta, RecordingDetail as Detail, TranscriptSegment } from "../../lib/types";
 import { languageLabel, msToMmss, stageLabel, statusLabel } from "../../lib/format";
 import { StatusBadge } from "./StatusBadge";
@@ -101,6 +101,17 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack: () => void
         {languageLabel(detail.language) && (
           <p className="sub" style={{ marginTop: 10 }}>전사 언어: {languageLabel(detail.language)}</p>
         )}
+      </div>
+
+      {/* Independent of transcription status: a failed transcript is exactly when
+          the original recording needs listening to. */}
+      <div className="card">
+        <h2>녹음 듣기</h2>
+        <audio className="player" controls preload="metadata" src={audioUrl(id, "webm")} />
+        <div className="btn-group">
+          <a className="btn btn-secondary" href={audioUrl(id, "mp3")}>MP3 다운로드</a>
+        </div>
+        <p className="sub">MP3는 처음 내려받을 때 변환되므로 긴 녹음은 잠시 걸릴 수 있습니다.</p>
       </div>
 
       {detail.status === "failed" && (

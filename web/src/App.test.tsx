@@ -15,6 +15,7 @@ vi.mock("./lib/api", () => ({
     transcript: { segments: [{ speaker: "SPEAKER_00", start_ms: 0, end_ms: 1000, text: "안녕" }], full_text: "안녕", language: "ko" },
   }),
   exportUrl: vi.fn().mockReturnValue("#"),
+  audioUrl: vi.fn().mockReturnValue("#"),
   retryRecording: vi.fn().mockResolvedValue(undefined),
 }));
 const recorderState = { isRecording: false, elapsedMs: 0, start: vi.fn(), stop: vi.fn() };
