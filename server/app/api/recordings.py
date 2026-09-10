@@ -28,8 +28,7 @@ def _detail(rec) -> dict:
     """The full single-recording shape. One definition so every endpoint that
     returns a recording stays in sync (GET and PATCH used to drift)."""
     return {"id": rec.id, "title": rec.title, "status": rec.status,
-            "created_at": rec.created_at.isoformat(), "duration_sec": rec.duration_sec,
-            "error": rec.error, "transcript": rec.transcript, "meta": rec.meta,
+            "created_at": rec.created_at.isoformat(), "error": rec.error, "transcript": rec.transcript, "meta": rec.meta,
             "language": rec.language, "stage": rec.stage}
 
 
@@ -99,8 +98,7 @@ def list_recordings(request: Request):
     with Session(request.app.state.engine) as session:
         return [
             {"id": r.id, "title": r.title, "status": r.status,
-             "created_at": r.created_at.isoformat(), "duration_sec": r.duration_sec,
-             "meta": r.meta, "language": r.language, "stage": r.stage}
+             "created_at": r.created_at.isoformat(), "meta": r.meta, "language": r.language, "stage": r.stage}
             for r in repo.list_recordings(session)
         ]
 

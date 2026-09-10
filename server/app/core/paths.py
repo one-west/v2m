@@ -28,10 +28,6 @@ def get_models_dir() -> Path:
     return _ensure("models")
 
 
-def get_logs_dir() -> Path:
-    return _ensure("logs")
-
-
 def get_db_path() -> Path:
     db_dir = _ensure("db")
     return db_dir / "v2m.db"

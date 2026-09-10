@@ -15,13 +15,13 @@
   → 로컬 서버 업로드 → WhisperX: STT + 화자분리 + 타임스탬프
   → SQLite 저장 → 화면에 회의 정보 폼 + 화자별 전사본 표시
   → "전사본 + 프롬프트 복사" → claude.ai 데스크탑 앱에 붙여넣기 → 정형화 회의록
-  (전사본 Markdown/TXT 내보내기 가능)
+  (녹음 원본 재생 · mp3 다운로드 · 전사본 Markdown/TXT 내보내기 가능)
 ```
 
 ## 상태
 
-- ✅ **백엔드**(`server/`, FastAPI): 업로드 → 백그라운드 전사 잡 → 전사본/프롬프트/내보내기 API + 회의 정보(meta). 53 테스트.
-- ✅ **프론트엔드**(`web/`, Vite + React + TS): 녹음·회의정보 입력·목록·전사본 뷰·claude.ai용 복사·내보내기. 27 테스트.
+- ✅ **백엔드**(`server/`, FastAPI): 업로드 → 백그라운드 전사 잡 → 전사본/프롬프트/내보내기 API + 회의 정보(meta) + 녹음 재생·mp3 다운로드. 95 테스트.
+- ✅ **프론트엔드**(`web/`, Vite + React + TS): 녹음·회의정보 입력·목록·전사본 뷰·녹음 재생·claude.ai용 복사·내보내기. 52 테스트.
 - ✅ **실제 WhisperX 전사 검증 완료**(Windows, Python 3.12): STT + 단어 정렬 + 화자분리 end-to-end.
 - 🔜 **데스크탑 앱**(pywebview 패키징)은 Phase 2 계획 — 아직 미구현.
 
@@ -47,6 +47,7 @@ v2m/
 | 백엔드 + 테스트 | Python 3.11+ |
 | **실제 전사(`[ml]`)** | **Python 3.11–3.12** (torch/ctranslate2가 3.13/3.14 휠 미지원), **ffmpeg**(PATH) |
 | 화자분리 | HuggingFace 토큰 + `pyannote/speaker-diarization-community-1` 게이트 약관 동의(무료, 1회) |
+| **mp3 다운로드** | **ffmpeg**(PATH 또는 `V2M_FFMPEG_DIR`) — 전사와 같은 ffmpeg를 씁니다 |
 | 프론트엔드 | Node.js 18+ |
 
 > 테스트 스위트는 가짜 전사기를 쓰므로 torch/whisperx 없이 어떤 3.11+ 에서도 동작합니다.
@@ -85,7 +86,7 @@ npm run dev        # 백엔드(:8000) + 프론트(:5174) 동시 실행
 cd server
 python -m venv .venv && .venv/Scripts/activate        # Windows
 pip install -e ".[dev]"                                # 앱 + 테스트 (torch 없음)
-python -m pytest -q                                    # 39 tests
+python -m pytest -q                                    # 95 tests
 
 # 실제 전사까지 하려면 (Python 3.12 venv 권장):
 #   pip install -e ".[dev,ml]"
@@ -100,7 +101,7 @@ python run.py                                          # http://127.0.0.1:8000
 cd web
 npm install
 npm run dev      # 개발 서버 (백엔드 :8000 으로 /api 프록시)
-npm test         # 23 tests
+npm test         # 52 tests
 npm run build    # web/dist 생성 → 백엔드가 / 에서 서빙
 ```
 

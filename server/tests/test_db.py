@@ -7,7 +7,11 @@ from app.store import repo
 
 
 def _make_pre_meta_db(path) -> None:
-    """Create a `recording` table as it existed BEFORE the `meta` column was added."""
+    """Create a `recording` table as it existed BEFORE the `meta` column was added.
+
+    It still carries `duration_sec`, which the model has since dropped — so this
+    also covers a live DB keeping a column the model no longer maps.
+    """
     con = sqlite3.connect(path)
     con.execute(
         "CREATE TABLE recording ("

@@ -13,7 +13,6 @@ export interface RecordingSummary {
   title: string;
   status: RecordingStatus;
   created_at: string;
-  duration_sec: number | null;
   meta: MeetingMeta | null;
   language: string | null;
   stage: string | null;
@@ -37,7 +36,6 @@ export interface RecordingDetail {
   title: string;
   status: RecordingStatus;
   created_at: string;
-  duration_sec: number | null;
   error: string | null;
   transcript: Transcript | null;
   meta: MeetingMeta | null;

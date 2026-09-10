@@ -5,7 +5,7 @@ vi.mock("../lib/api", () => ({ listRecordings: vi.fn() }));
 import { listRecordings } from "../lib/api";
 import { useRecordings } from "./useRecordings";
 
-const sample = [{ id: "a", title: "T", status: "done", created_at: "x", duration_sec: null }];
+const sample = [{ id: "a", title: "T", status: "done", created_at: "x" }];
 
 beforeEach(() => {
   vi.clearAllMocks();

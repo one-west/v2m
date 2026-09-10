@@ -14,7 +14,7 @@ vi.mock("./CopyForClaude", () => ({ CopyForClaude: () => <div>copy-stub</div> })
 import { getRecording, patchRecording, retryRecording } from "../../lib/api";
 
 const doneDetail = {
-  id: "a", title: "주간회의", status: "done", created_at: "x", duration_sec: 60, error: null,
+  id: "a", title: "주간회의", status: "done", created_at: "x", error: null,
   meta: { location: "A" }, language: "ko",
   transcript: {
     segments: [
@@ -77,7 +77,7 @@ describe("RecordingDetail", () => {
 
   it("shows the current transcription stage while transcribing", async () => {
     (getRecording as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: "a", title: "주간회의", status: "transcribing", created_at: "x", duration_sec: 60,
+      id: "a", title: "주간회의", status: "transcribing", created_at: "x",
       error: null, meta: null, language: "ko", stage: "diarizing", transcript: null,
     });
     render(<RecordingDetail id="a" onBack={vi.fn()} />);
@@ -110,7 +110,7 @@ describe("RecordingDetail", () => {
     vi.useFakeTimers();
     const transcribingDetail = {
       id: "a", title: "주간회의", status: "transcribing", created_at: "x",
-      duration_sec: 60, error: null, transcript: null, meta: null,
+      error: null, transcript: null, meta: null,
     };
     (getRecording as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce(transcribingDetail)

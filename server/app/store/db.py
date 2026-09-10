@@ -1,6 +1,5 @@
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Optional
 
 from sqlalchemy import Engine
 from sqlmodel import Session, SQLModel, create_engine
@@ -32,8 +31,3 @@ def _migrate_recording_columns(engine: Engine) -> None:
             if name not in existing:
                 conn.exec_driver_sql(f"ALTER TABLE recording ADD COLUMN {name} {ddl_type}")
 
-
-@contextmanager
-def session_scope(engine: Engine) -> Iterator[Session]:
-    with Session(engine) as session:
-        yield session

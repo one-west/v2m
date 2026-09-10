@@ -5,13 +5,13 @@ import { App } from "./App";
 
 vi.mock("./lib/api", () => ({
   listRecordings: vi.fn().mockResolvedValue([
-    { id: "a", title: "주간회의", status: "done", created_at: "x", duration_sec: 1, meta: null },
+    { id: "a", title: "주간회의", status: "done", created_at: "x", meta: null },
   ]),
   deleteRecording: vi.fn().mockResolvedValue(undefined),
   uploadRecording: vi.fn().mockResolvedValue({ id: "a" }),
   patchRecording: vi.fn().mockResolvedValue({}),
   getRecording: vi.fn().mockResolvedValue({
-    id: "a", title: "주간회의", status: "done", created_at: "x", duration_sec: 1, error: null, meta: null,
+    id: "a", title: "주간회의", status: "done", created_at: "x", error: null, meta: null,
     transcript: { segments: [{ speaker: "SPEAKER_00", start_ms: 0, end_ms: 1000, text: "안녕" }], full_text: "안녕", language: "ko" },
   }),
   exportUrl: vi.fn().mockReturnValue("#"),

@@ -5,9 +5,9 @@ import { RecordingList } from "./RecordingList";
 import type { RecordingSummary } from "../../lib/types";
 
 const rows: RecordingSummary[] = [
-  { id: "a", title: "주간회의", status: "done", created_at: "x", duration_sec: 60,
+  { id: "a", title: "주간회의", status: "done", created_at: "x",
     meta: { date: "2026-06-23", attendees: "홍길동, 김철수" }, language: "ko", stage: null },
-  { id: "b", title: "스프린트", status: "transcribing", created_at: "y", duration_sec: null,
+  { id: "b", title: "스프린트", status: "transcribing", created_at: "y",
     meta: null, language: null, stage: "diarizing" },
 ];
 
