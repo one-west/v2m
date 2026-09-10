@@ -160,17 +160,21 @@ def test_failed_transcode_leaves_no_partial_cache(client, monkeypatch):
     assert not (get_audio_dir() / f"{rec_id}.mp3").exists()
 
 
-def test_delete_removes_the_mp3_cache_too(client, monkeypatch):
+def test_delete_removes_the_audio_and_every_file_derived_from_it(client, monkeypatch):
     import app.api.recordings as rec_mod
 
     monkeypatch.setattr(rec_mod, "transcode_to_mp3",
                         lambda src, dst, exe: dst.write_bytes(b"ID3-mp3-bytes"))
     rec_id = _upload(client)
     client.get(f"/api/recordings/{rec_id}/audio", params={"format": "mp3"})
-    assert (get_audio_dir() / f"{rec_id}.mp3").exists()
+    # A remux temp file survives only when the process is killed mid-convert; it must
+    # not then outlive the recording it belongs to.
+    (get_audio_dir() / f"{rec_id}.remux.tmp.webm").write_bytes(b"interrupted")
+    assert len(list(get_audio_dir().glob(f"{rec_id}*"))) == 3
 
-    client.delete(f"/api/recordings/{rec_id}")
+    assert client.delete(f"/api/recordings/{rec_id}").status_code == 204
     assert list(get_audio_dir().glob(f"{rec_id}*")) == []
+    assert client.get(f"/api/recordings/{rec_id}").status_code == 404
 
 
 def _durationless_webm(tmp_path):
