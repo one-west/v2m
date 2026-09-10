@@ -47,3 +47,23 @@ def remux_webm(src: Path, dst: Path, exe: str) -> None:
     74-minute recording, since no audio is decoded.
     """
     _run(exe, ["-i", str(src), "-c", "copy", str(dst)])
+
+
+def probe_duration(path: Path, exe: str) -> Optional[float]:
+    """Container duration in seconds, or None when it has none / can't be read.
+
+    Uses the ffprobe sitting next to the given ffmpeg.
+    """
+    probe = Path(exe).with_name(_EXE.replace("ffmpeg", "ffprobe"))
+    proc = subprocess.run(
+        [str(probe) if probe.is_file() else "ffprobe", "-hide_banner", "-loglevel", "error",
+         "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", str(path)],
+        capture_output=True, text=True,
+    )
+    out = proc.stdout.strip()
+    if proc.returncode != 0 or out in ("", "N/A"):
+        return None
+    try:
+        return float(out)
+    except ValueError:
+        return None

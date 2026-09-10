@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -9,7 +10,7 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.jobs.queue import run_transcription
-from app.core.ffmpeg import find_ffmpeg, remux_webm, transcode_to_mp3
+from app.core.ffmpeg import find_ffmpeg, probe_duration, remux_webm, transcode_to_mp3
 from app.core.paths import get_audio_dir
 from app.export.markdown import content_disposition, to_markdown, to_txt
 from app.prompt.builder import build_prompt
@@ -32,12 +33,37 @@ def _detail(rec) -> dict:
             "language": rec.language, "stage": rec.stage}
 
 
-# Files derived from a recording's audio, cached beside it and removed with it.
-_DERIVED_SUFFIXES = (".play.webm", ".mp3")
-
-
 def _derived(source: Path, suffix: str) -> Path:
     return source.parent / f"{source.stem}{suffix}"
+
+
+def _ensure_seekable(source: Path, exe: str) -> None:
+    """Upgrade a MediaRecorder WebM in place so browsers can seek it.
+
+    MediaRecorder streams its output live and never writes a duration into the
+    container, so `<audio>` reports `duration === Infinity` and the scrubber does
+    nothing. A `-c copy` remux restores it — lossless and fast (~0.3s for 68 MB of
+    audio, ~1s for 194 MB), which is why the result replaces the original instead
+    of being cached alongside it: these archives run to gigabytes.
+
+    The recording is irreplaceable, so the original is only unlinked once ffmpeg
+    has succeeded AND the result probes as a readable file with a duration. Any
+    failure leaves the original exactly as it was; playback still works, without
+    seeking. Best-effort throughout — never raises.
+    """
+    try:
+        if probe_duration(source, exe) is not None:
+            return  # already seekable (remuxed before, or not from MediaRecorder)
+        tmp = source.with_name(f"{source.stem}.remux.tmp{source.suffix}")
+        try:
+            remux_webm(source, tmp, exe)
+            if probe_duration(tmp, exe) is None:
+                raise RuntimeError("remux produced a file with no readable duration")
+            os.replace(tmp, source)  # atomic on the same volume
+        finally:
+            tmp.unlink(missing_ok=True)
+    except Exception:  # noqa: BLE001 - seeking is a bonus; playback must not break
+        pass
 
 
 def _audio_headers(title: str, ext: str, rec_id: str) -> dict:
@@ -188,17 +214,9 @@ def get_audio(request: Request, rec_id: str, format: str = "webm"):
     exe = find_ffmpeg(request.app.state.settings.ffmpeg_dir)
 
     if format == "webm":
-        # MediaRecorder never writes a duration, so the browser reports Infinity and
-        # cannot seek. Remuxing (no re-encode, ~0.3s per hour of audio) restores it;
-        # if ffmpeg is unavailable the original still plays, just without seeking.
-        playable = _derived(source, ".play.webm")
-        if not playable.is_file() and exe is not None:
-            try:
-                remux_webm(source, playable, exe)
-            except Exception:  # noqa: BLE001 - playback matters more than seeking
-                playable.unlink(missing_ok=True)
-        served = playable if playable.is_file() else source
-        return FileResponse(served, media_type="audio/webm",
+        if exe is not None:
+            _ensure_seekable(source, exe)
+        return FileResponse(source, media_type="audio/webm",
                             headers=_audio_headers(title, "webm", rec_id))
 
     # Convert once and keep the result next to the original: re-encoding a
@@ -236,6 +254,5 @@ def delete_recording(request: Request, rec_id: str):
         repo.delete_recording(session, rec_id)
     if audio:
         audio.unlink(missing_ok=True)
-        for suffix in _DERIVED_SUFFIXES:  # the playback/download caches
-            _derived(audio, suffix).unlink(missing_ok=True)
+        _derived(audio, ".mp3").unlink(missing_ok=True)  # the download cache
     return Response(status_code=204)
