@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.jobs.queue import run_transcription
-from app.core.ffmpeg import find_ffmpeg, transcode_to_mp3
+from app.core.ffmpeg import find_ffmpeg, remux_webm, transcode_to_mp3
 from app.core.paths import get_audio_dir
 from app.export.markdown import content_disposition, to_markdown, to_txt
 from app.prompt.builder import build_prompt
@@ -30,6 +30,23 @@ def _detail(rec) -> dict:
     return {"id": rec.id, "title": rec.title, "status": rec.status,
             "created_at": rec.created_at.isoformat(), "error": rec.error, "transcript": rec.transcript, "meta": rec.meta,
             "language": rec.language, "stage": rec.stage}
+
+
+# Files derived from a recording's audio, cached beside it and removed with it.
+_DERIVED_SUFFIXES = (".play.webm", ".mp3")
+
+
+def _derived(source: Path, suffix: str) -> Path:
+    return source.parent / f"{source.stem}{suffix}"
+
+
+def _audio_headers(title: str, ext: str, rec_id: str) -> dict:
+    # no-cache = revalidate, not "don't store": the file behind a URL can change
+    # (the remux appears once ffmpeg is available), and without an explicit
+    # Cache-Control browsers apply heuristic freshness and serve the stale body
+    # for hours. FileResponse still sends an ETag, so revalidation is a cheap 304.
+    return {"Content-Disposition": content_disposition(title, ext, rec_id),
+            "Cache-Control": "no-cache"}
 
 
 def _schedule(request: Request, background: BackgroundTasks, rec_id: str) -> None:
@@ -168,15 +185,26 @@ def get_audio(request: Request, rec_id: str, format: str = "webm"):
     if source is None or not source.is_file():
         raise HTTPException(status_code=404, detail="audio file not found")
 
+    exe = find_ffmpeg(request.app.state.settings.ffmpeg_dir)
+
     if format == "webm":
-        return FileResponse(source, media_type="audio/webm",
-                            headers={"Content-Disposition": content_disposition(title, "webm", rec_id)})
+        # MediaRecorder never writes a duration, so the browser reports Infinity and
+        # cannot seek. Remuxing (no re-encode, ~0.3s per hour of audio) restores it;
+        # if ffmpeg is unavailable the original still plays, just without seeking.
+        playable = _derived(source, ".play.webm")
+        if not playable.is_file() and exe is not None:
+            try:
+                remux_webm(source, playable, exe)
+            except Exception:  # noqa: BLE001 - playback matters more than seeking
+                playable.unlink(missing_ok=True)
+        served = playable if playable.is_file() else source
+        return FileResponse(served, media_type="audio/webm",
+                            headers=_audio_headers(title, "webm", rec_id))
 
     # Convert once and keep the result next to the original: re-encoding a
     # multi-hour meeting on every download would cost a minute each time.
-    mp3 = source.with_suffix(".mp3")
+    mp3 = _derived(source, ".mp3")
     if not mp3.is_file():
-        exe = find_ffmpeg(request.app.state.settings.ffmpeg_dir)
         if exe is None:
             raise HTTPException(
                 status_code=503,
@@ -188,8 +216,7 @@ def get_audio(request: Request, rec_id: str, format: str = "webm"):
             # Never leave a truncated file behind: it would be served as a valid cache.
             mp3.unlink(missing_ok=True)
             raise HTTPException(status_code=500, detail=f"mp3 변환에 실패했습니다: {exc}")
-    return FileResponse(mp3, media_type="audio/mpeg",
-                        headers={"Content-Disposition": content_disposition(title, "mp3", rec_id)})
+    return FileResponse(mp3, media_type="audio/mpeg", headers=_audio_headers(title, "mp3", rec_id))
 
 
 @router.post("/recordings/{rec_id}/retry")
@@ -209,5 +236,6 @@ def delete_recording(request: Request, rec_id: str):
         repo.delete_recording(session, rec_id)
     if audio:
         audio.unlink(missing_ok=True)
-        audio.with_suffix(".mp3").unlink(missing_ok=True)  # the download cache
+        for suffix in _DERIVED_SUFFIXES:  # the playback/download caches
+            _derived(audio, suffix).unlink(missing_ok=True)
     return Response(status_code=204)

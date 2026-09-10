@@ -14,12 +14,68 @@ def _upload(client, payload=WEBM_BYTES):
     return client.post("/api/recordings", files=files).json()["id"]
 
 
-def test_serves_the_original_webm(client):
+def test_webm_is_remuxed_once_then_served_from_cache(client, monkeypatch):
+    """MediaRecorder writes no duration, so the browser reports Infinity and cannot
+    seek. A `-c copy` remux restores it; it is cached because it costs nothing to keep."""
+    import app.api.recordings as rec_mod
+
+    calls = []
+
+    def fake_remux(src, dst, exe):
+        calls.append(src)
+        dst.write_bytes(b"remuxed-webm")
+
+    monkeypatch.setattr(rec_mod, "remux_webm", fake_remux)
+    rec_id = _upload(client)
+
+    first = client.get(f"/api/recordings/{rec_id}/audio")
+    assert first.status_code == 200
+    assert first.content == b"remuxed-webm"
+    assert first.headers["content-type"].startswith("audio/webm")
+
+    assert client.get(f"/api/recordings/{rec_id}/audio").content == b"remuxed-webm"
+    assert len(calls) == 1
+
+
+def test_webm_falls_back_to_the_original_when_ffmpeg_is_missing(client, monkeypatch):
+    import app.api.recordings as rec_mod
+
+    monkeypatch.setattr(rec_mod, "find_ffmpeg", lambda _dir: None)
+    rec_id = _upload(client)
+    resp = client.get(f"/api/recordings/{rec_id}/audio")
+    # Playback must keep working without ffmpeg — only seeking degrades.
+    assert resp.status_code == 200
+    assert resp.content == WEBM_BYTES
+
+
+def test_webm_falls_back_to_the_original_when_remux_fails(client, monkeypatch):
+    import app.api.recordings as rec_mod
+
+    def broken_remux(src, dst, exe):
+        dst.write_bytes(b"half")
+        raise RuntimeError("ffmpeg exited 1")
+
+    monkeypatch.setattr(rec_mod, "remux_webm", broken_remux)
     rec_id = _upload(client)
     resp = client.get(f"/api/recordings/{rec_id}/audio")
     assert resp.status_code == 200
     assert resp.content == WEBM_BYTES
-    assert resp.headers["content-type"].startswith("audio/webm")
+    # A truncated remux must not be left behind to be served as a cache next time.
+    assert not (get_audio_dir() / f"{rec_id}.play.webm").exists()
+
+
+def test_audio_responses_must_be_revalidated(client, monkeypatch):
+    """Without Cache-Control a browser applies heuristic freshness and will keep
+    serving a stale body after the file behind the URL changes (e.g. the remux
+    appearing once ffmpeg is installed). ETag keeps revalidation cheap."""
+    import app.api.recordings as rec_mod
+
+    monkeypatch.setattr(rec_mod, "remux_webm", lambda src, dst, exe: dst.write_bytes(b"remuxed"))
+    monkeypatch.setattr(rec_mod, "transcode_to_mp3", lambda src, dst, exe: dst.write_bytes(b"mp3"))
+    rec_id = _upload(client)
+    for fmt in ("webm", "mp3"):
+        resp = client.get(f"/api/recordings/{rec_id}/audio", params={"format": fmt})
+        assert resp.headers.get("cache-control") == "no-cache", fmt
 
 
 def test_audio_404_for_unknown_recording(client):
@@ -79,31 +135,66 @@ def test_failed_transcode_leaves_no_partial_cache(client, monkeypatch):
     assert not (get_audio_dir() / f"{rec_id}.mp3").exists()
 
 
-def test_delete_removes_the_mp3_cache_too(client, monkeypatch):
+def test_delete_removes_every_derived_file(client, monkeypatch):
     import app.api.recordings as rec_mod
 
     monkeypatch.setattr(rec_mod, "transcode_to_mp3",
                         lambda src, dst, exe: dst.write_bytes(b"ID3-mp3-bytes"))
+    monkeypatch.setattr(rec_mod, "remux_webm",
+                        lambda src, dst, exe: dst.write_bytes(b"remuxed-webm"))
     rec_id = _upload(client)
+    client.get(f"/api/recordings/{rec_id}/audio")
     client.get(f"/api/recordings/{rec_id}/audio", params={"format": "mp3"})
-    mp3 = get_audio_dir() / f"{rec_id}.mp3"
-    assert mp3.exists()
+    derived = [get_audio_dir() / f"{rec_id}{s}" for s in (".webm", ".play.webm", ".mp3")]
+    assert all(p.exists() for p in derived)
 
     client.delete(f"/api/recordings/{rec_id}")
-    assert not mp3.exists()
-    assert not (get_audio_dir() / f"{rec_id}.webm").exists()
+    assert not any(p.exists() for p in derived)
+
+
+def _durationless_webm(tmp_path):
+    """A webm with no duration in its header, the way MediaRecorder writes them."""
+    full = tmp_path / "tone.webm"
+    subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+         "-i", "sine=frequency=440:duration=1", "-c:a", "libopus", str(full)],
+        check=True,
+    )
+    stripped = tmp_path / "live.webm"
+    subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(full),
+         "-c", "copy", "-live", "1", str(stripped)],
+        check=True,
+    )
+    return stripped
+
+
+def _probe_duration(path):
+    out = subprocess.run(
+        ["ffprobe", "-hide_banner", "-loglevel", "error", "-show_entries",
+         "format=duration", "-of", "default=nw=1:nk=1", str(path)],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    return None if out in ("", "N/A") else float(out)
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not on PATH")
+def test_real_ffmpeg_restores_the_duration_a_browser_needs_to_seek(client, tmp_path):
+    src = _durationless_webm(tmp_path)
+    assert _probe_duration(src) is None, "fixture must start with no duration"
+    rec_id = _upload(client, src.read_bytes())
+
+    resp = client.get(f"/api/recordings/{rec_id}/audio")
+    assert resp.status_code == 200
+    served = tmp_path / "served.webm"
+    served.write_bytes(resp.content)
+    assert _probe_duration(served) == pytest.approx(1.0, abs=0.2)
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not on PATH")
 def test_real_ffmpeg_produces_a_playable_mp3(client, tmp_path):
     """End-to-end through the actual encoder — the mocked tests above only cover caching."""
-    src = tmp_path / "tone.webm"
-    subprocess.run(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
-         "-i", "sine=frequency=440:duration=1", "-c:a", "libopus", str(src)],
-        check=True,
-    )
-    rec_id = _upload(client, src.read_bytes())
+    rec_id = _upload(client, _durationless_webm(tmp_path).read_bytes())
 
     resp = client.get(f"/api/recordings/{rec_id}/audio", params={"format": "mp3"})
     assert resp.status_code == 200

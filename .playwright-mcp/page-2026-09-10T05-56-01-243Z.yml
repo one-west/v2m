@@ -1,0 +1,41 @@
+- generic [ref=f1e2]:
+  - banner [ref=f1e3]:
+    - generic [ref=f1e4]: V
+    - heading "V2M" [level=1] [ref=f1e5]
+    - generic [ref=f1e6]: 음성에서 회의록까지
+  - main [ref=f1e7]:
+    - generic [ref=f1e8]:
+      - heading "새 회의" [level=2] [ref=f1e9]
+      - generic [ref=f1e10]:
+        - generic [ref=f1e11]:
+          - generic [ref=f1e12]:
+            - generic [ref=f1e13]: 제목
+            - textbox "제목" [ref=f1e14]
+          - generic [ref=f1e15]:
+            - generic [ref=f1e16]: 일자
+            - textbox "일자" [ref=f1e17]
+          - generic [ref=f1e18]:
+            - generic [ref=f1e19]: 시간
+            - textbox "시간" [ref=f1e20]
+          - generic [ref=f1e21]:
+            - generic [ref=f1e22]: 장소
+            - textbox "장소" [ref=f1e23]
+        - generic [ref=f1e24]:
+          - generic [ref=f1e25]: 참석자
+          - textbox "참석자" [ref=f1e26]:
+            - /placeholder: "쉼표로 구분 (예: 홍길동, 김철수)"
+        - generic [ref=f1e27]:
+          - generic [ref=f1e28]: 안건/목적
+          - textbox "안건/목적" [ref=f1e29]
+      - generic [ref=f1e30]:
+        - generic [ref=f1e31]: 전사 언어
+        - combobox "전사 언어" [ref=f1e32]:
+          - option "한국어" [selected]
+          - option "English"
+          - option "자동 감지"
+      - generic [ref=f1e33]:
+        - generic [ref=f1e34]: 00:00
+        - button "녹음 시작" [ref=f1e35] [cursor=pointer]
+    - generic [ref=f1e36]:
+      - heading "회의 목록" [level=2] [ref=f1e37]
+      - paragraph [ref=f1e38]: 불러오는 중…
