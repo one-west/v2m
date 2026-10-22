@@ -20,7 +20,7 @@ On Windows use the venv's python explicitly (do not rely on a globally-activated
 
 ```bash
 # from server/
-.venv/Scripts/python.exe -m pytest -q                         # full suite (95 tests)
+.venv/Scripts/python.exe -m pytest -q                         # full suite (100 tests)
 .venv/Scripts/python.exe -m pytest tests/test_repo.py -v       # one file
 .venv/Scripts/python.exe -m pytest tests/test_jobs.py::test_success_path_sets_done_with_transcript -v  # one test
 .venv/Scripts/python.exe -m pip install -e ".[dev]"            # base + dev deps (NO torch — tests don't need it)
